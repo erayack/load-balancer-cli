@@ -19,14 +19,7 @@ fn requests_zero_fails() {
 #[test]
 fn empty_servers_fails() {
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
-    cmd.args([
-        "--algo",
-        "round-robin",
-        "--servers",
-        "",
-        "--requests",
-        "1",
-    ]);
+    cmd.args(["--algo", "round-robin", "--servers", "", "--requests", "1"]);
     cmd.assert()
         .failure()
         .stderr(contains("Error: servers must not be empty"));

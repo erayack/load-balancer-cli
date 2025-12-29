@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
 
-use crate::models::{Algorithm, Server};
+use crate::models::{Algorithm, Server, SimError, SimResult};
 
 #[derive(Parser, Debug)]
 #[command(name = "load-balancer-cli")]
@@ -37,46 +37,40 @@ impl From<AlgoArg> for Algorithm {
     }
 }
 
-pub fn parse_args() -> Result<Args, String> {
-    Args::try_parse().map_err(|e| e.to_string())
+pub fn parse_args() -> SimResult<Args> {
+    Args::try_parse().map_err(|e| SimError::Cli(e.to_string()))
 }
 
-pub fn parse_servers(input: &str) -> Result<Vec<Server>, String> {
+pub fn parse_servers(input: &str) -> SimResult<Vec<Server>> {
     let mut servers = Vec::new();
     let mut name_to_id: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
     let mut next_id = 0usize;
 
     if input.trim().is_empty() {
-        return Err("servers must not be empty".to_string());
+        return Err(SimError::EmptyServersInput);
     }
 
     for entry in input.split(',') {
         let trimmed = entry.trim();
         if trimmed.is_empty() {
-            return Err("servers must not contain empty entries".to_string());
+            return Err(SimError::EmptyServerEntry);
         }
 
         let mut parts = trimmed.split(':');
         let name = parts.next().unwrap_or("").trim();
         let latency_str = parts.next().unwrap_or("").trim();
         if parts.next().is_some() {
-            return Err(format!(
-                "invalid server entry '{}': expected name:latency_ms",
-                trimmed
-            ));
+            return Err(SimError::InvalidServerEntry(trimmed.to_string()));
         }
         if name.is_empty() || latency_str.is_empty() {
-            return Err(format!(
-                "invalid server entry '{}': expected name:latency_ms",
-                trimmed
-            ));
+            return Err(SimError::InvalidServerEntry(trimmed.to_string()));
         }
 
         let latency_ms: u64 = latency_str
             .parse()
-            .map_err(|_| format!("invalid latency in '{}'", trimmed))?;
+            .map_err(|_| SimError::InvalidLatency(trimmed.to_string()))?;
         if latency_ms == 0 {
-            return Err(format!("latency must be > 0 in '{}'", trimmed));
+            return Err(SimError::InvalidLatencyValue(trimmed.to_string()));
         }
 
         let id = match name_to_id.get(name) {
@@ -139,24 +133,24 @@ mod tests {
     #[test]
     fn parse_servers_rejects_trailing_commas() {
         let err = parse_servers("a:10,").unwrap_err();
-        assert_eq!(err, "servers must not contain empty entries");
+        assert_eq!(err.to_string(), "servers must not contain empty entries");
     }
 
     #[test]
     fn parse_servers_rejects_empty_segments() {
         let err = parse_servers("a:10,,b:20").unwrap_err();
-        assert_eq!(err, "servers must not contain empty entries");
+        assert_eq!(err.to_string(), "servers must not contain empty entries");
     }
 
     #[test]
     fn parse_servers_rejects_comma_only_input() {
         let err = parse_servers(",").unwrap_err();
-        assert_eq!(err, "servers must not contain empty entries");
+        assert_eq!(err.to_string(), "servers must not contain empty entries");
     }
 
     #[test]
     fn parse_servers_rejects_whitespace_only_input() {
         let err = parse_servers(" ").unwrap_err();
-        assert_eq!(err, "servers must not be empty");
+        assert_eq!(err.to_string(), "servers must not be empty");
     }
 }

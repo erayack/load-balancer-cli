@@ -1,3 +1,43 @@
+use std::fmt;
+
+#[derive(Clone, Debug)]
+pub enum SimError {
+    EmptyServers,
+    RequestsZero,
+    DuplicateServerId(usize),
+    InvalidServerEntry(String),
+    InvalidLatency(String),
+    InvalidLatencyValue(String),
+    EmptyServerEntry,
+    EmptyServersInput,
+    Cli(String),
+}
+
+pub type SimResult<T> = Result<T, SimError>;
+
+impl fmt::Display for SimError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SimError::EmptyServers | SimError::EmptyServersInput => {
+                write!(f, "servers must not be empty")
+            }
+            SimError::EmptyServerEntry => write!(f, "servers must not contain empty entries"),
+            SimError::RequestsZero => write!(f, "requests must be greater than 0"),
+            SimError::DuplicateServerId(id) => write!(f, "duplicate server id {}", id),
+            SimError::InvalidServerEntry(entry) => write!(
+                f,
+                "invalid server entry '{}': expected name:latency_ms",
+                entry
+            ),
+            SimError::InvalidLatency(entry) => write!(f, "invalid latency in '{}'", entry),
+            SimError::InvalidLatencyValue(entry) => {
+                write!(f, "latency must be > 0 in '{}'", entry)
+            }
+            SimError::Cli(message) => write!(f, "{}", message),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Server {
     pub id: usize,
