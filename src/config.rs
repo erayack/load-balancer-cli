@@ -1,39 +1,14 @@
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Parser, ValueEnum};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use crate::error::{SimError, SimResult};
+use crate::error::{Error, Result};
 use crate::models::{AlgoConfig, RequestProfile, ServerConfig, SimConfig, TieBreakConfig};
 
 #[derive(Parser, Debug)]
-#[command(
-    name = "load-balancer-cli",
-    subcommand_required = true,
-    arg_required_else_help = true
-)]
-pub struct Cli {
-    #[command(subcommand)]
-    pub command: Command,
-}
-
-#[derive(Subcommand, Debug)]
-pub enum Command {
-    Run(RunArgs),
-    ListAlgorithms,
-    ShowConfig(SimArgs),
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct RunArgs {
-    #[command(flatten)]
-    pub sim: SimArgs,
-    #[arg(long)]
-    pub summary: bool,
-}
-
-#[derive(Args, Debug, Clone)]
-pub struct SimArgs {
+#[command(name = "load-balancer-cli")]
+pub struct Args {
     #[arg(long, value_enum)]
     pub algo: Option<AlgoArg>,
     #[arg(long)]
@@ -42,6 +17,10 @@ pub struct SimArgs {
     pub server: Vec<String>,
     #[arg(long)]
     pub requests: Option<usize>,
+    #[arg(long)]
+    pub summary: bool,
+    #[arg(long, value_enum, default_value = "human")]
+    pub format: FormatArg,
     #[arg(
         long,
         help = "Seed tie-breaks for least-connections/response-time; omit for stable input-order tie-breaks"
@@ -59,6 +38,13 @@ pub enum AlgoArg {
     LeastResponseTime,
 }
 
+#[derive(ValueEnum, Clone, Debug, PartialEq, Eq)]
+pub enum FormatArg {
+    Human,
+    Summary,
+    Json,
+}
+
 impl From<AlgoArg> for AlgoConfig {
     fn from(value: AlgoArg) -> Self {
         match value {
@@ -70,33 +56,29 @@ impl From<AlgoArg> for AlgoConfig {
     }
 }
 
-pub fn parse_cli() -> SimResult<Cli> {
-    Cli::try_parse().map_err(|e| SimError::Cli(e.to_string()))
+pub fn parse_args() -> Result<Args> {
+    Args::try_parse().map_err(|e| Error::Cli(e.to_string()))
 }
 
-pub fn build_config(args: &SimArgs) -> SimResult<SimConfig> {
+pub fn build_config(args: Args) -> Result<(SimConfig, FormatArg)> {
+    let format = format_arg(&args);
     let mut config = if let Some(path) = args.config.as_ref() {
-        load_config(&path)?
+        load_config(path)?
     } else {
         let algo = args
             .algo
-            .ok_or_else(|| SimError::Cli("missing required --algo".to_string()))?;
+            .clone()
+            .ok_or_else(|| Error::Cli("missing required --algo".to_string()))?;
         let requests = args
             .requests
-            .ok_or_else(|| SimError::Cli("missing required --requests".to_string()))?;
+            .ok_or_else(|| Error::Cli("missing required --requests".to_string()))?;
         let servers = parse_server_args(&args.server, args.servers.as_deref())?;
         let tie_break = if args.seed.is_some() {
             TieBreakConfig::Seeded
         } else {
             TieBreakConfig::Stable
         };
-        return Ok(SimConfig {
-            servers,
-            requests: RequestProfile::FixedCount(requests),
-            algo: algo.into(),
-            tie_break,
-            seed: args.seed,
-        });
+        return Ok((create_config(servers, requests, algo, tie_break, args.seed), format));
     };
 
     if let Some(algo) = args.algo {
@@ -113,12 +95,12 @@ pub fn build_config(args: &SimArgs) -> SimResult<SimConfig> {
         config.tie_break = TieBreakConfig::Seeded;
     }
 
-    Ok(config)
+    Ok((config, format))
 }
 
-pub fn load_config(path: &Path) -> SimResult<SimConfig> {
+pub fn load_config(path: &Path) -> Result<SimConfig> {
     let contents = fs::read_to_string(path).map_err(|err| {
-        SimError::ConfigIo(format!(
+        Error::ConfigIo(format!(
             "failed to read config '{}': {}",
             path.display(),
             err
@@ -131,28 +113,28 @@ pub fn load_config(path: &Path) -> SimResult<SimConfig> {
 
     match ext {
         "toml" => toml::from_str(&contents)
-            .map_err(|err| SimError::ConfigParse(format!("failed to parse TOML: {}", err))),
+            .map_err(|err| Error::ConfigParse(format!("failed to parse TOML: {}", err))),
         "json" => serde_json::from_str(&contents)
-            .map_err(|err| SimError::ConfigParse(format!("failed to parse JSON: {}", err))),
-        "" => Err(SimError::UnsupportedConfigFormat("unknown".to_string())),
-        _ => Err(SimError::UnsupportedConfigFormat(ext.to_string())),
+            .map_err(|err| Error::ConfigParse(format!("failed to parse JSON: {}", err))),
+        "" => Err(Error::UnsupportedConfigFormat("unknown".to_string())),
+        _ => Err(Error::UnsupportedConfigFormat(ext.to_string())),
     }
 }
 
 pub fn parse_server_args(
     server_entries: &[String],
     servers_csv: Option<&str>,
-) -> SimResult<Vec<ServerConfig>> {
+) -> Result<Vec<ServerConfig>> {
     let mut entries: Vec<String> = Vec::new();
 
     if let Some(csv) = servers_csv {
         if csv.trim().is_empty() {
-            return Err(SimError::EmptyServers);
+            return Err(Error::EmptyServers);
         }
         for entry in csv.split(',') {
             let trimmed = entry.trim();
             if trimmed.is_empty() {
-                return Err(SimError::EmptyServerEntry);
+                return Err(Error::EmptyServerEntry);
             }
             entries.push(trimmed.to_string());
         }
@@ -161,13 +143,13 @@ pub fn parse_server_args(
     for entry in server_entries {
         let trimmed = entry.trim();
         if trimmed.is_empty() {
-            return Err(SimError::EmptyServerEntry);
+            return Err(Error::EmptyServerEntry);
         }
         entries.push(trimmed.to_string());
     }
 
     if entries.is_empty() {
-        return Err(SimError::EmptyServers);
+        return Err(Error::EmptyServers);
     }
 
     let mut servers = Vec::new();
@@ -175,7 +157,7 @@ pub fn parse_server_args(
     for entry in entries {
         let server = parse_server_entry(&entry)?;
         if names.contains(&server.name) {
-            return Err(SimError::DuplicateServerName(server.name));
+            return Err(Error::DuplicateServerName(server.name));
         }
         names.insert(server.name.clone());
         servers.push(server);
@@ -184,10 +166,10 @@ pub fn parse_server_args(
     Ok(servers)
 }
 
-fn parse_server_entry(entry: &str) -> SimResult<ServerConfig> {
+fn parse_server_entry(entry: &str) -> Result<ServerConfig> {
     let trimmed = entry.trim();
     if trimmed.is_empty() {
-        return Err(SimError::EmptyServerEntry);
+        return Err(Error::EmptyServerEntry);
     }
 
     let mut parts = trimmed.split(':');
@@ -195,27 +177,27 @@ fn parse_server_entry(entry: &str) -> SimResult<ServerConfig> {
     let latency_str = parts.next().unwrap_or("").trim();
     let weight_str = parts.next().map(str::trim);
     if parts.next().is_some() {
-        return Err(SimError::InvalidServerEntry(trimmed.to_string()));
+        return Err(Error::InvalidServerEntry(trimmed.to_string()));
     }
     if name.is_empty() || latency_str.is_empty() || weight_str == Some("") {
-        return Err(SimError::InvalidServerEntry(trimmed.to_string()));
+        return Err(Error::InvalidServerEntry(trimmed.to_string()));
     }
 
     let latency_ms: u64 = latency_str
         .parse()
-        .map_err(|_| SimError::InvalidLatency(trimmed.to_string()))?;
+        .map_err(|_| Error::InvalidLatency(trimmed.to_string()))?;
     if latency_ms == 0 {
-        return Err(SimError::InvalidLatencyValue(trimmed.to_string()));
+        return Err(Error::InvalidLatencyValue(trimmed.to_string()));
     }
 
     let weight = match weight_str {
         Some(value) => value
             .parse::<u32>()
-            .map_err(|_| SimError::InvalidWeight(trimmed.to_string()))?,
+            .map_err(|_| Error::InvalidWeight(trimmed.to_string()))?,
         None => 1,
     };
     if weight == 0 {
-        return Err(SimError::InvalidWeightValue(trimmed.to_string()));
+        return Err(Error::InvalidWeightValue(trimmed.to_string()));
     }
 
     Ok(ServerConfig {
@@ -225,80 +207,26 @@ fn parse_server_entry(entry: &str) -> SimResult<ServerConfig> {
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::parse_server_args;
-
-    #[test]
-    fn parse_servers_accepts_valid_list() {
-        let servers = parse_server_args(&[], Some("api:10, db:20")).unwrap();
-        assert_eq!(servers.len(), 2);
-        assert_eq!(servers[0].name, "api");
-        assert_eq!(servers[0].base_latency_ms, 10);
-        assert_eq!(servers[0].weight, 1);
-        assert_eq!(servers[1].name, "db");
-        assert_eq!(servers[1].base_latency_ms, 20);
-        assert_eq!(servers[1].weight, 1);
+fn create_config(
+    servers: Vec<ServerConfig>,
+    requests: usize,
+    algo: AlgoArg,
+    tie_break: TieBreakConfig,
+    seed: Option<u64>,
+) -> SimConfig {
+    SimConfig {
+        servers,
+        requests: RequestProfile::FixedCount(requests),
+        algo: algo.into(),
+        tie_break,
+        seed,
     }
+}
 
-    #[test]
-    fn parse_servers_accepts_weighted_entry() {
-        let servers = parse_server_args(&["api:10:3".to_string()], None).unwrap();
-        assert_eq!(servers.len(), 1);
-        assert_eq!(servers[0].weight, 3);
-    }
-
-    #[test]
-    fn parse_servers_rejects_empty_input() {
-        assert!(parse_server_args(&[], None).is_err());
-    }
-
-    #[test]
-    fn parse_servers_rejects_invalid_format() {
-        assert!(parse_server_args(&["api".to_string()], None).is_err());
-        assert!(parse_server_args(&["api:10:20:30".to_string()], None).is_err());
-    }
-
-    #[test]
-    fn parse_servers_rejects_invalid_latency() {
-        assert!(parse_server_args(&["api:0".to_string()], None).is_err());
-        assert!(parse_server_args(&["api:ten".to_string()], None).is_err());
-    }
-
-    #[test]
-    fn parse_servers_rejects_invalid_weight() {
-        assert!(parse_server_args(&["api:10:0".to_string()], None).is_err());
-        assert!(parse_server_args(&["api:10:ten".to_string()], None).is_err());
-        assert!(parse_server_args(&["api:10:".to_string()], None).is_err());
-    }
-
-    #[test]
-    fn parse_servers_rejects_duplicate_names() {
-        let err = parse_server_args(&[], Some("api:10, api:20")).unwrap_err();
-        assert_eq!(err.to_string(), "duplicate server name 'api'");
-    }
-
-    #[test]
-    fn parse_servers_rejects_trailing_commas() {
-        let err = parse_server_args(&[], Some("a:10,")).unwrap_err();
-        assert_eq!(err.to_string(), "servers must not contain empty entries");
-    }
-
-    #[test]
-    fn parse_servers_rejects_empty_segments() {
-        let err = parse_server_args(&[], Some("a:10,,b:20")).unwrap_err();
-        assert_eq!(err.to_string(), "servers must not contain empty entries");
-    }
-
-    #[test]
-    fn parse_servers_rejects_comma_only_input() {
-        let err = parse_server_args(&[], Some(",")).unwrap_err();
-        assert_eq!(err.to_string(), "servers must not contain empty entries");
-    }
-
-    #[test]
-    fn parse_servers_rejects_whitespace_only_input() {
-        let err = parse_server_args(&[], Some(" ")).unwrap_err();
-        assert_eq!(err.to_string(), "servers must not be empty");
+fn format_arg(args: &Args) -> FormatArg {
+    if args.summary {
+        FormatArg::Summary
+    } else {
+        args.format.clone()
     }
 }

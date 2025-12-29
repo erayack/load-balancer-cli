@@ -1,4 +1,4 @@
-use crate::models::TieBreakConfig;
+use serde::Serialize;
 
 #[derive(Clone, Debug)]
 pub struct ServerState {
@@ -24,26 +24,33 @@ pub struct Request {
     pub arrival_ms: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Assignment {
     pub request_id: usize,
     pub server_id: usize,
+    pub server_name: String,
     pub started_at: u64,
     pub completed_at: u64,
     pub score: Option<u64>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ServerSummary {
     pub name: String,
     pub requests: u32,
     pub avg_response_ms: u64,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
+pub struct RunMetadata {
+    pub algo: String,
+    pub tie_break: String,
+    pub duration_ms: u64,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct SimulationResult {
     pub assignments: Vec<Assignment>,
     pub totals: Vec<ServerSummary>,
-    pub tie_break: TieBreakConfig,
-    pub seed: Option<u64>,
+    pub metadata: RunMetadata,
 }

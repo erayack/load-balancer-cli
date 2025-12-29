@@ -1,14 +1,7 @@
-use load_balancer_cli::config::{self, Command};
+use load_balancer_cli::config::{self, FormatArg};
 use load_balancer_cli::engine;
-use load_balancer_cli::error::SimResult;
-use load_balancer_cli::output;
-
-const ALGORITHMS: [&str; 4] = [
-    "round-robin",
-    "weighted-round-robin",
-    "least-connections",
-    "least-response-time",
-];
+use load_balancer_cli::error::Result;
+use load_balancer_cli::output::{Formatter, HumanFormatter, JsonFormatter, SummaryFormatter};
 
 fn main() {
     if let Err(err) = run() {
@@ -17,30 +10,22 @@ fn main() {
     }
 }
 
-fn run() -> SimResult<()> {
-    match config::parse_cli()?.command {
-        Command::Run(args) => {
-            let config = config::build_config(&args.sim)?;
-            let result = engine::run_simulation(&config)?;
+fn run() -> Result<()> {
+    let args = config::parse_args()?;
+    let (config, format) = config::build_config(args)?;
+    let result = engine::run_simulation(&config)?;
 
-            if args.summary {
-                output::print_summary(&result);
-                return Ok(());
-            }
+    let formatter = formatter_for(&format);
+    let output = formatter.write(&result);
+    print!("{}", output);
 
-            output::print_full(&config, &result)?;
-            Ok(())
-        }
-        Command::ListAlgorithms => {
-            for name in ALGORITHMS {
-                println!("{}", name);
-            }
-            Ok(())
-        }
-        Command::ShowConfig(args) => {
-            let config = config::build_config(&args)?;
-            output::print_config(&config);
-            Ok(())
-        }
+    Ok(())
+}
+
+fn formatter_for(format: &FormatArg) -> Box<dyn Formatter> {
+    match format {
+        FormatArg::Human => Box::new(HumanFormatter),
+        FormatArg::Summary => Box::new(SummaryFormatter),
+        FormatArg::Json => Box::new(JsonFormatter),
     }
 }

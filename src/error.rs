@@ -1,64 +1,39 @@
-use std::fmt;
+use thiserror::Error;
 
-#[derive(Clone, Debug)]
-pub enum SimError {
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("servers must not be empty")]
     EmptyServers,
-    RequestsZero,
-    DuplicateServerName(String),
-    InvalidServerEntry(String),
-    InvalidLatency(String),
-    InvalidLatencyValue(String),
-    InvalidWeight(String),
-    InvalidWeightValue(String),
-    InvalidRequestRate(f64),
-    InvalidRequestDuration(u64),
-    InvalidTieBreakSeed,
+    #[error("servers must not contain empty entries")]
     EmptyServerEntry,
+    #[error("requests must be greater than 0")]
+    RequestsZero,
+    #[error("duplicate server name '{0}'")]
+    DuplicateServerName(String),
+    #[error("invalid server entry '{0}': expected name:latency_ms[:weight]")]
+    InvalidServerEntry(String),
+    #[error("invalid latency in '{0}'")]
+    InvalidLatency(String),
+    #[error("latency must be > 0 in '{0}'")]
+    InvalidLatencyValue(String),
+    #[error("invalid weight in '{0}'")]
+    InvalidWeight(String),
+    #[error("weight must be > 0 in '{0}'")]
+    InvalidWeightValue(String),
+    #[error("request rate must be > 0 (got {0})")]
+    InvalidRequestRate(f64),
+    #[error("request duration must be > 0 (got {0}ms)")]
+    InvalidRequestDuration(u64),
+    #[error("tie-break seed required when tie_break is seeded")]
+    InvalidTieBreakSeed,
+    #[error("{0}")]
     ConfigIo(String),
+    #[error("{0}")]
     ConfigParse(String),
+    #[error("unsupported config format '{0}'")]
     UnsupportedConfigFormat(String),
+    #[error("{0}")]
     Cli(String),
 }
 
-pub type SimResult<T> = Result<T, SimError>;
-
-impl fmt::Display for SimError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SimError::EmptyServers => write!(f, "servers must not be empty"),
-            SimError::EmptyServerEntry => write!(f, "servers must not contain empty entries"),
-            SimError::RequestsZero => write!(f, "requests must be greater than 0"),
-            SimError::DuplicateServerName(name) => {
-                write!(f, "duplicate server name '{}'", name)
-            }
-            SimError::InvalidServerEntry(entry) => write!(
-                f,
-                "invalid server entry '{}': expected name:latency_ms[:weight]",
-                entry
-            ),
-            SimError::InvalidLatency(entry) => write!(f, "invalid latency in '{}'", entry),
-            SimError::InvalidLatencyValue(entry) => {
-                write!(f, "latency must be > 0 in '{}'", entry)
-            }
-            SimError::InvalidWeight(entry) => write!(f, "invalid weight in '{}'", entry),
-            SimError::InvalidWeightValue(entry) => {
-                write!(f, "weight must be > 0 in '{}'", entry)
-            }
-            SimError::InvalidRequestRate(rate) => {
-                write!(f, "request rate must be > 0 (got {})", rate)
-            }
-            SimError::InvalidRequestDuration(duration) => {
-                write!(f, "request duration must be > 0 (got {}ms)", duration)
-            }
-            SimError::InvalidTieBreakSeed => {
-                write!(f, "tie-break seed required when tie_break is seeded")
-            }
-            SimError::ConfigIo(message) => write!(f, "{}", message),
-            SimError::ConfigParse(message) => write!(f, "{}", message),
-            SimError::UnsupportedConfigFormat(format) => {
-                write!(f, "unsupported config format '{}'", format)
-            }
-            SimError::Cli(message) => write!(f, "{}", message),
-        }
-    }
-}
+pub type Result<T> = std::result::Result<T, Error>;

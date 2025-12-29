@@ -4,10 +4,10 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashSet};
 
 use crate::algorithms::{build_strategy, SelectionContext, SelectionStrategy};
-use crate::error::{SimError, SimResult};
+use crate::error::{Error, Result};
 use crate::events::{Event, Request, ScheduledEvent};
 use crate::models::{RequestProfile, ServerConfig, SimConfig, TieBreakConfig};
-use crate::state::{Assignment, EngineState, ServerState, ServerSummary, SimulationResult};
+use crate::state::{Assignment, EngineState, RunMetadata, ServerState, ServerSummary, SimulationResult};
 
 pub struct SimulationEngine {
     pub config: SimConfig,
@@ -37,7 +37,7 @@ impl SimulationEngine {
         }
     }
 
-    pub fn run(&mut self) -> SimResult<SimulationResult> {
+    pub fn run(&mut self) -> Result<SimulationResult> {
         validate_config(&self.config)?;
         let requests = build_requests(&self.config.requests, self.config.seed)?;
 
@@ -94,6 +94,7 @@ impl SimulationEngine {
                     self.state.assignments.push(Assignment {
                         request_id: request.id,
                         server_id: server_idx,
+                        server_name: server.name.clone(),
                         started_at,
                         completed_at,
                         score: selection.score,
@@ -130,67 +131,78 @@ impl SimulationEngine {
             })
             .collect();
 
+        let duration_ms = self
+            .state
+            .assignments
+            .iter()
+            .map(|assignment| assignment.completed_at)
+            .max()
+            .unwrap_or(0);
+
         Ok(SimulationResult {
             assignments: self.state.assignments.clone(),
             totals,
-            tie_break: self.config.tie_break.clone(),
-            seed: self.config.seed,
+            metadata: RunMetadata {
+                algo: self.config.algo.to_string(),
+                tie_break: self.config.tie_break.label_with_seed(self.config.seed),
+                duration_ms,
+            },
         })
     }
 }
 
-pub fn run_simulation(config: &SimConfig) -> SimResult<SimulationResult> {
+pub fn run_simulation(config: &SimConfig) -> Result<SimulationResult> {
     let strategy = build_strategy(config.algo.clone());
     let mut engine = SimulationEngine::new(config.clone(), strategy);
     engine.run()
 }
 
-fn validate_config(config: &SimConfig) -> SimResult<()> {
+fn validate_config(config: &SimConfig) -> Result<()> {
     if config.servers.is_empty() {
-        return Err(SimError::EmptyServers);
+        return Err(Error::EmptyServers);
     }
     let mut names = HashSet::new();
     for server in &config.servers {
         if server.name.trim().is_empty() {
-            return Err(SimError::InvalidServerEntry(server.name.clone()));
+            return Err(Error::InvalidServerEntry(server.name.clone()));
         }
         if server.base_latency_ms == 0 {
-            return Err(SimError::InvalidLatencyValue(server.name.clone()));
+            return Err(Error::InvalidLatencyValue(server.name.clone()));
         }
         if server.weight == 0 {
-            return Err(SimError::InvalidWeightValue(server.name.clone()));
+            return Err(Error::InvalidWeightValue(server.name.clone()));
         }
         if names.contains(&server.name) {
-            return Err(SimError::DuplicateServerName(server.name.clone()));
+            return Err(Error::DuplicateServerName(server.name.clone()));
         }
         names.insert(server.name.clone());
     }
 
     match config.requests {
-        RequestProfile::FixedCount(0) => return Err(SimError::RequestsZero),
+        RequestProfile::FixedCount(0) => return Err(Error::RequestsZero),
         RequestProfile::FixedCount(_) => {}
         RequestProfile::Poisson { rate, duration_ms } => {
             if rate <= 0.0 {
-                return Err(SimError::InvalidRequestRate(rate));
+                return Err(Error::InvalidRequestRate(rate));
             }
             if duration_ms == 0 {
-                return Err(SimError::InvalidRequestDuration(duration_ms));
+                return Err(Error::InvalidRequestDuration(duration_ms));
             }
         }
     }
 
     if matches!(config.tie_break, TieBreakConfig::Seeded) && config.seed.is_none() {
-        return Err(SimError::InvalidTieBreakSeed);
+        return Err(Error::InvalidTieBreakSeed);
     }
 
     Ok(())
 }
 
-fn build_requests(profile: &RequestProfile, seed: Option<u64>) -> SimResult<Vec<Request>> {
+fn build_requests(profile: &RequestProfile, seed: Option<u64>) -> Result<Vec<Request>> {
     match profile {
         RequestProfile::FixedCount(count) => {
             if *count == 0 {
-                return Err(SimError::RequestsZero);
+                return Err(Error::RequestsZero);
             }
             Ok((0..*count)
                 .map(|idx| Request {
@@ -201,10 +213,10 @@ fn build_requests(profile: &RequestProfile, seed: Option<u64>) -> SimResult<Vec<
         }
         RequestProfile::Poisson { rate, duration_ms } => {
             if *rate <= 0.0 {
-                return Err(SimError::InvalidRequestRate(*rate));
+                return Err(Error::InvalidRequestRate(*rate));
             }
             if *duration_ms == 0 {
-                return Err(SimError::InvalidRequestDuration(*duration_ms));
+                return Err(Error::InvalidRequestDuration(*duration_ms));
             }
 
             let mut rng = StdRng::seed_from_u64(seed.unwrap_or(0));
@@ -230,7 +242,7 @@ fn build_requests(profile: &RequestProfile, seed: Option<u64>) -> SimResult<Vec<
             }
 
             if requests.is_empty() {
-                return Err(SimError::RequestsZero);
+                return Err(Error::RequestsZero);
             }
 
             Ok(requests)
@@ -271,7 +283,7 @@ impl RngCore for StableRng {
         }
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> std::result::Result<(), rand::Error> {
         self.fill_bytes(dest);
         Ok(())
     }

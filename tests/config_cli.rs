@@ -27,8 +27,15 @@ servers = [
 "#;
     let path = write_temp_config(config, "toml");
 
-    let expected =
-        "Summary:\na: 2 requests (avg response: 10ms)\nb: 1 requests (avg response: 20ms)\n";
+    let expected = concat!(
+        "Metadata:\n",
+        "algo: round-robin\n",
+        "tie_break: seeded(42)\n",
+        "duration_ms: 21\n",
+        "Summary:\n",
+        "a: 2 requests (avg response: 10ms)\n",
+        "b: 1 requests (avg response: 20ms)\n",
+    );
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args(["run", "--config", path.to_str().unwrap(), "--summary"]);
     cmd.assert().success().stdout(diff(expected));
@@ -36,8 +43,15 @@ servers = [
 
 #[test]
 fn repeatable_server_flag_parses() {
-    let expected =
-        "Summary:\napi: 1 requests (avg response: 10ms)\ndb: 1 requests (avg response: 20ms)\n";
+    let expected = concat!(
+        "Metadata:\n",
+        "algo: round-robin\n",
+        "tie_break: stable\n",
+        "duration_ms: 21\n",
+        "Summary:\n",
+        "api: 1 requests (avg response: 10ms)\n",
+        "db: 1 requests (avg response: 20ms)\n",
+    );
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
