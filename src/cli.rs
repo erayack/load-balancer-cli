@@ -13,7 +13,10 @@ pub struct Args {
     pub requests: usize,
     #[arg(long)]
     pub summary: bool,
-    #[arg(long)]
+    #[arg(
+        long,
+        help = "Seed tie-breaks for least-connections/response-time; omit for stable input-order tie-breaks"
+    )]
     pub seed: Option<u64>,
 }
 

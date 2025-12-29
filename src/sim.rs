@@ -1,16 +1,19 @@
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
-use crate::models::{Algorithm, Assignment, Server, ServerSummary, SimulationResult};
+use crate::models::{Algorithm, Assignment, Server, ServerSummary, SimulationResult, TieBreak};
 
 pub fn run_simulation(
     mut servers: Vec<Server>,
     algo: Algorithm,
     request_count: usize,
-    seed: Option<u64>,
+    tie_break: TieBreak,
 ) -> SimulationResult {
     let mut assignments = Vec::with_capacity(request_count);
-    let mut rng = seed.map(StdRng::seed_from_u64);
+    let mut rng = match &tie_break {
+        TieBreak::Seeded(seed) => Some(StdRng::seed_from_u64(*seed)),
+        TieBreak::Stable => None,
+    };
     let mut next_idx = 0usize;
 
     for request_id in 1..=request_count {
@@ -54,6 +57,7 @@ pub fn run_simulation(
     SimulationResult {
         assignments,
         totals,
+        tie_break,
     }
 }
 
@@ -180,7 +184,7 @@ mod tests {
             Server::test_at(1, "db", 20, 0),
             Server::test_at(2, "cache", 30, 0),
         ];
-        let result = run_simulation(servers, Algorithm::RoundRobin, 2, None);
+        let result = run_simulation(servers, Algorithm::RoundRobin, 2, TieBreak::Stable);
         let names: Vec<&str> = result
             .totals
             .iter()

@@ -2,7 +2,7 @@ mod cli;
 mod models;
 mod sim;
 
-use crate::models::{Algorithm, SimulationResult};
+use crate::models::{Algorithm, SimulationResult, TieBreak};
 
 fn main() {
     if let Err(err) = run() {
@@ -22,17 +22,20 @@ fn run() -> Result<(), String> {
     }
 
     let algo: Algorithm = args.algo.clone().into();
-    let result = sim::run_simulation(servers, algo, args.requests, args.seed);
+    let tie_break = match args.seed {
+        Some(seed) => TieBreak::Seeded(seed),
+        None => TieBreak::Stable,
+    };
+    let result = sim::run_simulation(servers, algo, args.requests, tie_break);
 
     if args.summary {
         print_summary(&result);
         return Ok(());
     }
 
-    if args.seed.is_some() {
-        println!("Tie-break: seeded");
-    } else {
-        println!("Tie-break: stable index tie-break");
+    match &result.tie_break {
+        TieBreak::Seeded(seed) => println!("Tie-break: seeded({})", seed),
+        TieBreak::Stable => println!("Tie-break: stable"),
     }
 
     for assignment in &result.assignments {
