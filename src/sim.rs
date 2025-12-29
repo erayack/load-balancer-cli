@@ -98,11 +98,9 @@ pub(crate) fn run_simulation(
     let mut counts = vec![0u32; servers.len()];
     let mut total_response_ms = vec![0u64; servers.len()];
     for assignment in &assignments {
-        let idx = id_to_index
-            .get(&assignment.server_id)
-            .expect("assignment server_id missing from servers");
-        counts[*idx] += 1;
-        total_response_ms[*idx] += assignment.completed_at - assignment.started_at;
+        let idx = id_to_index[&assignment.server_id];
+        counts[idx] += 1;
+        total_response_ms[idx] += assignment.completed_at - assignment.started_at;
     }
 
     let totals = servers
