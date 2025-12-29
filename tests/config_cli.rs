@@ -37,7 +37,7 @@ servers = [
         "b: 1 requests (avg response: 20ms)\n",
     );
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
-    cmd.args(["--config", path.to_str().unwrap(), "--summary"]);
+    cmd.args(["run", "--config", path.to_str().unwrap(), "--summary"]);
     cmd.assert().success().stdout(diff(expected));
 }
 
@@ -55,6 +55,7 @@ fn repeatable_server_flag_parses() {
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
+        "run",
         "--algo",
         "round-robin",
         "--server",

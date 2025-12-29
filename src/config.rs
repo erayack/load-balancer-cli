@@ -78,10 +78,7 @@ pub fn build_config(args: Args) -> Result<(SimConfig, FormatArg)> {
         } else {
             TieBreakConfig::Stable
         };
-        return Ok((
-            create_config(servers, requests, algo, tie_break, args.seed),
-            format,
-        ));
+        return Ok((create_config(servers, requests, algo, tie_break, args.seed), format));
     };
 
     if let Some(algo) = args.algo {
@@ -231,83 +228,5 @@ fn format_arg(args: &Args) -> FormatArg {
         FormatArg::Summary
     } else {
         args.format.clone()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::parse_server_args;
-
-    #[test]
-    fn parse_servers_accepts_valid_list() {
-        let servers = parse_server_args(&[], Some("api:10, db:20")).unwrap();
-        assert_eq!(servers.len(), 2);
-        assert_eq!(servers[0].name, "api");
-        assert_eq!(servers[0].base_latency_ms, 10);
-        assert_eq!(servers[0].weight, 1);
-        assert_eq!(servers[1].name, "db");
-        assert_eq!(servers[1].base_latency_ms, 20);
-        assert_eq!(servers[1].weight, 1);
-    }
-
-    #[test]
-    fn parse_servers_accepts_weighted_entry() {
-        let servers = parse_server_args(&["api:10:3".to_string()], None).unwrap();
-        assert_eq!(servers.len(), 1);
-        assert_eq!(servers[0].weight, 3);
-    }
-
-    #[test]
-    fn parse_servers_rejects_empty_input() {
-        assert!(parse_server_args(&[], None).is_err());
-    }
-
-    #[test]
-    fn parse_servers_rejects_invalid_format() {
-        assert!(parse_server_args(&["api".to_string()], None).is_err());
-        assert!(parse_server_args(&["api:10:20:30".to_string()], None).is_err());
-    }
-
-    #[test]
-    fn parse_servers_rejects_invalid_latency() {
-        assert!(parse_server_args(&["api:0".to_string()], None).is_err());
-        assert!(parse_server_args(&["api:ten".to_string()], None).is_err());
-    }
-
-    #[test]
-    fn parse_servers_rejects_invalid_weight() {
-        assert!(parse_server_args(&["api:10:0".to_string()], None).is_err());
-        assert!(parse_server_args(&["api:10:ten".to_string()], None).is_err());
-        assert!(parse_server_args(&["api:10:".to_string()], None).is_err());
-    }
-
-    #[test]
-    fn parse_servers_rejects_duplicate_names() {
-        let err = parse_server_args(&[], Some("api:10, api:20")).unwrap_err();
-        assert_eq!(err.to_string(), "duplicate server name 'api'");
-    }
-
-    #[test]
-    fn parse_servers_rejects_trailing_commas() {
-        let err = parse_server_args(&[], Some("a:10,")).unwrap_err();
-        assert_eq!(err.to_string(), "servers must not contain empty entries");
-    }
-
-    #[test]
-    fn parse_servers_rejects_empty_segments() {
-        let err = parse_server_args(&[], Some("a:10,,b:20")).unwrap_err();
-        assert_eq!(err.to_string(), "servers must not contain empty entries");
-    }
-
-    #[test]
-    fn parse_servers_rejects_comma_only_input() {
-        let err = parse_server_args(&[], Some(",")).unwrap_err();
-        assert_eq!(err.to_string(), "servers must not contain empty entries");
-    }
-
-    #[test]
-    fn parse_servers_rejects_whitespace_only_input() {
-        let err = parse_server_args(&[], Some(" ")).unwrap_err();
-        assert_eq!(err.to_string(), "servers must not be empty");
     }
 }

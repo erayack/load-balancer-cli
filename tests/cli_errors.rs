@@ -4,6 +4,7 @@ use predicates::str::contains;
 fn requests_zero_fails() {
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
+        "run",
         "--algo",
         "round-robin",
         "--server",
@@ -19,7 +20,15 @@ fn requests_zero_fails() {
 #[test]
 fn empty_servers_fails() {
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
-    cmd.args(["--algo", "round-robin", "--servers", "", "--requests", "1"]);
+    cmd.args([
+        "run",
+        "--algo",
+        "round-robin",
+        "--servers",
+        "",
+        "--requests",
+        "1",
+    ]);
     cmd.assert()
         .failure()
         .stderr(contains("Error: servers must not be empty"));
@@ -29,6 +38,7 @@ fn empty_servers_fails() {
 fn invalid_latency_fails() {
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
+        "run",
         "--algo",
         "round-robin",
         "--server",
@@ -45,6 +55,7 @@ fn invalid_latency_fails() {
 fn duplicate_server_names_fail() {
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
+        "run",
         "--algo",
         "round-robin",
         "--server",
