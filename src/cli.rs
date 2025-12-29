@@ -1,7 +1,7 @@
 use clap::{Parser, ValueEnum};
 use std::collections::HashSet;
 
-use crate::models::{Algorithm, Server, SimError};
+use crate::models::{Algorithm, Server, SimError, SimResult};
 
 #[derive(Parser, Debug)]
 #[command(name = "load-balancer-cli")]
@@ -38,40 +38,32 @@ impl From<AlgoArg> for Algorithm {
     }
 }
 
-pub fn parse_args() -> Result<Args, SimError> {
-    Args::try_parse().map_err(|e| SimError::Message(e.to_string()))
+pub fn parse_args() -> SimResult<Args> {
+    Args::try_parse().map_err(|e| SimError::Cli(e.to_string()))
 }
 
-pub fn parse_servers(input: &str) -> Result<Vec<Server>, SimError> {
+pub fn parse_servers(input: &str) -> SimResult<Vec<Server>> {
     let mut servers = Vec::new();
     let mut names = HashSet::new();
 
     if input.trim().is_empty() {
-        return Err(SimError::Message("servers must not be empty".to_string()));
+        return Err(SimError::EmptyServersInput);
     }
 
     for (id, entry) in input.split(',').enumerate() {
         let trimmed = entry.trim();
         if trimmed.is_empty() {
-            return Err(SimError::Message(
-                "servers must not contain empty entries".to_string(),
-            ));
+            return Err(SimError::EmptyServerEntry);
         }
 
         let mut parts = trimmed.split(':');
         let name = parts.next().unwrap_or("").trim();
         let latency_str = parts.next().unwrap_or("").trim();
         if parts.next().is_some() {
-            return Err(SimError::Message(format!(
-                "invalid server entry '{}': expected name:latency_ms",
-                trimmed
-            )));
+            return Err(SimError::InvalidServerEntry(trimmed.to_string()));
         }
         if name.is_empty() || latency_str.is_empty() {
-            return Err(SimError::Message(format!(
-                "invalid server entry '{}': expected name:latency_ms",
-                trimmed
-            )));
+            return Err(SimError::InvalidServerEntry(trimmed.to_string()));
         }
 
         if names.contains(name) {
@@ -81,12 +73,9 @@ pub fn parse_servers(input: &str) -> Result<Vec<Server>, SimError> {
 
         let latency_ms: u64 = latency_str
             .parse()
-            .map_err(|_| SimError::Message(format!("invalid latency in '{}'", trimmed)))?;
+            .map_err(|_| SimError::InvalidLatency(trimmed.to_string()))?;
         if latency_ms == 0 {
-            return Err(SimError::Message(format!(
-                "latency must be > 0 in '{}'",
-                trimmed
-            )));
+            return Err(SimError::InvalidLatencyValue(trimmed.to_string()));
         }
 
         servers.push(Server {

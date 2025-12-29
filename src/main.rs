@@ -2,7 +2,7 @@ mod cli;
 mod models;
 mod sim;
 
-use crate::models::{Algorithm, SimError, SimulationResult, TieBreak};
+use crate::models::{Algorithm, SimError, SimResult, SimulationResult, TieBreak};
 
 fn main() {
     if let Err(err) = run() {
@@ -11,13 +11,11 @@ fn main() {
     }
 }
 
-fn run() -> Result<(), SimError> {
+fn run() -> SimResult<()> {
     let args = cli::parse_args()?;
     let servers = cli::parse_servers(&args.servers)?;
     if args.requests == 0 {
-        return Err(SimError::Message(
-            "requests must be greater than 0".to_string(),
-        ));
+        return Err(SimError::RequestsZero);
     }
 
     let algo: Algorithm = args.algo.clone().into();

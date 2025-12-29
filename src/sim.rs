@@ -4,7 +4,7 @@ use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
 use crate::models::{
-    Algorithm, Assignment, Server, ServerSummary, SimError, SimulationResult, TieBreak,
+    Algorithm, Assignment, Server, ServerSummary, SimError, SimResult, SimulationResult, TieBreak,
 };
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -32,17 +32,14 @@ pub(crate) fn run_simulation(
     algo: Algorithm,
     request_count: usize,
     tie_break: TieBreak,
-) -> Result<SimulationResult, SimError> {
+) -> SimResult<SimulationResult> {
     if servers.is_empty() {
-        return Err(SimError::Message("servers must not be empty".to_string()));
+        return Err(SimError::EmptyServers);
     }
     let mut id_to_index = HashMap::new();
     for (idx, server) in servers.iter().enumerate() {
         if id_to_index.insert(server.id, idx).is_some() {
-            return Err(SimError::Message(format!(
-                "duplicate server id {}",
-                server.id
-            )));
+            return Err(SimError::DuplicateServerId(server.id));
         }
     }
     let mut assignments = Vec::with_capacity(request_count);
