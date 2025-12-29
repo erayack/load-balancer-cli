@@ -5,7 +5,8 @@ mod weighted_round_robin;
 
 use rand::RngCore;
 
-use crate::models::{Algorithm, ServerState};
+use crate::models::AlgoConfig;
+use crate::state::ServerState;
 
 pub use least_connections::LeastConnectionsStrategy;
 pub use least_response_time::LeastResponseTimeStrategy;
@@ -28,11 +29,11 @@ pub struct Selection {
     pub score: Option<u64>,
 }
 
-pub fn build_strategy(algo: Algorithm) -> Box<dyn SelectionStrategy> {
+pub fn build_strategy(algo: AlgoConfig) -> Box<dyn SelectionStrategy> {
     match algo {
-        Algorithm::RoundRobin => Box::new(RoundRobinStrategy::default()),
-        Algorithm::WeightedRoundRobin => Box::new(WeightedRoundRobinStrategy::default()),
-        Algorithm::LeastConnections => Box::new(LeastConnectionsStrategy),
-        Algorithm::LeastResponseTime => Box::new(LeastResponseTimeStrategy),
+        AlgoConfig::RoundRobin => Box::new(RoundRobinStrategy::default()),
+        AlgoConfig::WeightedRoundRobin => Box::new(WeightedRoundRobinStrategy::default()),
+        AlgoConfig::LeastConnections => Box::new(LeastConnectionsStrategy),
+        AlgoConfig::LeastResponseTime => Box::new(LeastResponseTimeStrategy),
     }
 }

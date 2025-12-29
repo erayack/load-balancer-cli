@@ -19,15 +19,39 @@ impl SelectionStrategy for RoundRobinStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Server;
+    use crate::state::ServerState;
     use rand::SeedableRng;
 
     #[test]
     fn round_robin_cycles_indices() {
         let servers = vec![
-            Server::test_at(0, "a", 10, 1, 0, 0),
-            Server::test_at(1, "b", 10, 1, 0, 0),
-            Server::test_at(2, "c", 10, 1, 0, 0),
+            ServerState {
+                id: 0,
+                name: "a".to_string(),
+                base_latency_ms: 10,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
+            ServerState {
+                id: 1,
+                name: "b".to_string(),
+                base_latency_ms: 10,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
+            ServerState {
+                id: 2,
+                name: "c".to_string(),
+                base_latency_ms: 10,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
         let mut strategy = RoundRobinStrategy::default();

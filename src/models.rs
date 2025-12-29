@@ -1,140 +1,48 @@
-use std::fmt;
+use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug)]
-pub enum SimError {
-    EmptyServers,
-    RequestsZero,
-    DuplicateServerId(usize),
-    DuplicateServerName(String),
-    InvalidServerEntry(String),
-    InvalidLatency(String),
-    InvalidLatencyValue(String),
-    InvalidWeight(String),
-    InvalidWeightValue(String),
-    EmptyServerEntry,
-    Cli(String),
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct SimConfig {
+    pub servers: Vec<ServerConfig>,
+    pub requests: RequestProfile,
+    pub algo: AlgoConfig,
+    #[serde(default)]
+    pub tie_break: TieBreakConfig,
+    #[serde(default)]
+    pub seed: Option<u64>,
 }
 
-pub type SimResult<T> = Result<T, SimError>;
-
-impl fmt::Display for SimError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SimError::EmptyServers => write!(f, "servers must not be empty"),
-            SimError::EmptyServerEntry => write!(f, "servers must not contain empty entries"),
-            SimError::RequestsZero => write!(f, "requests must be greater than 0"),
-            SimError::DuplicateServerId(id) => write!(f, "duplicate server id {}", id),
-            SimError::DuplicateServerName(name) => {
-                write!(f, "duplicate server name '{}'", name)
-            }
-            SimError::InvalidServerEntry(entry) => write!(
-                f,
-                "invalid server entry '{}': expected name:latency_ms[:weight]",
-                entry
-            ),
-            SimError::InvalidLatency(entry) => write!(f, "invalid latency in '{}'", entry),
-            SimError::InvalidLatencyValue(entry) => {
-                write!(f, "latency must be > 0 in '{}'", entry)
-            }
-            SimError::InvalidWeight(entry) => write!(f, "invalid weight in '{}'", entry),
-            SimError::InvalidWeightValue(entry) => {
-                write!(f, "weight must be > 0 in '{}'", entry)
-            }
-            SimError::Cli(message) => write!(f, "{}", message),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Server {
-    pub id: usize,
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ServerConfig {
     pub name: String,
     pub base_latency_ms: u64,
+    #[serde(default = "default_weight")]
     pub weight: u32,
-    pub active_connections: u32,
-    pub pick_count: u32,
 }
 
-pub type ServerState = Server;
-
-#[cfg(test)]
-impl Server {
-    pub fn test_at(
-        index: usize,
-        name: &str,
-        latency: u64,
-        weight: u32,
-        active_connections: u32,
-        pick_count: u32,
-    ) -> Self {
-        Self {
-            id: index,
-            name: name.to_string(),
-            base_latency_ms: latency,
-            weight,
-            active_connections,
-            pick_count,
-        }
-    }
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum RequestProfile {
+    FixedCount(usize),
+    Poisson { rate: f64, duration_ms: u64 },
 }
 
-#[derive(Clone, Debug)]
-pub enum Algorithm {
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum AlgoConfig {
     RoundRobin,
     WeightedRoundRobin,
     LeastConnections,
     LeastResponseTime,
 }
 
-#[derive(Clone, Debug)]
-pub enum TieBreak {
+#[derive(Clone, Debug, Deserialize, Serialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum TieBreakConfig {
+    #[default]
     Stable,
-    Seeded(u64),
+    Seeded,
 }
 
-impl fmt::Display for TieBreak {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            TieBreak::Stable => write!(f, "stable"),
-            TieBreak::Seeded(seed) => write!(f, "seeded({})", seed),
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct Assignment {
-    pub request_id: usize,
-    pub server_id: usize,
-    pub server_name: String,
-    pub score: Option<u64>,
-    pub started_at: u64,
-    pub completed_at: u64,
-}
-
-#[derive(Clone, Debug)]
-pub struct SimConfig {
-    pub servers: Vec<Server>,
-    pub requests: usize,
-    pub tie_break: TieBreak,
-}
-
-#[derive(Clone, Debug)]
-pub struct EngineState {
-    pub time_ms: u64,
-    pub servers: Vec<ServerState>,
-    pub assignments: Vec<Assignment>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ServerSummary {
-    pub name: String,
-    pub requests: u32,
-    pub avg_response_ms: u64,
-}
-
-#[derive(Clone, Debug)]
-pub struct SimulationResult {
-    pub assignments: Vec<Assignment>,
-    pub totals: Vec<ServerSummary>,
-    pub tie_break: TieBreak,
+fn default_weight() -> u32 {
+    1
 }

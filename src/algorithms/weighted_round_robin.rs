@@ -31,14 +31,30 @@ impl SelectionStrategy for WeightedRoundRobinStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Server;
+    use crate::state::ServerState;
     use rand::SeedableRng;
 
     #[test]
     fn weighted_round_robin_respects_weights() {
         let servers = vec![
-            Server::test_at(0, "a", 10, 2, 0, 0),
-            Server::test_at(1, "b", 10, 1, 0, 0),
+            ServerState {
+                id: 0,
+                name: "a".to_string(),
+                base_latency_ms: 10,
+                weight: 2,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
+            ServerState {
+                id: 1,
+                name: "b".to_string(),
+                base_latency_ms: 10,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
         let mut strategy = WeightedRoundRobinStrategy::default();

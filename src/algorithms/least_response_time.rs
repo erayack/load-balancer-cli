@@ -41,15 +41,39 @@ impl SelectionStrategy for LeastResponseTimeStrategy {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::Server;
+    use crate::state::ServerState;
     use rand::SeedableRng;
 
     #[test]
     fn least_response_time_prefers_lowest_score() {
         let servers = vec![
-            Server::test_at(0, "a", 30, 1, 0, 0),
-            Server::test_at(1, "b", 10, 1, 0, 2),
-            Server::test_at(2, "c", 20, 1, 0, 0),
+            ServerState {
+                id: 0,
+                name: "a".to_string(),
+                base_latency_ms: 30,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
+            ServerState {
+                id: 1,
+                name: "b".to_string(),
+                base_latency_ms: 10,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 2,
+                in_flight: 0,
+            },
+            ServerState {
+                id: 2,
+                name: "c".to_string(),
+                base_latency_ms: 20,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
         let mut strategy = LeastResponseTimeStrategy::default();
@@ -67,9 +91,33 @@ mod tests {
     #[test]
     fn least_response_time_uses_seeded_tiebreak() {
         let servers = vec![
-            Server::test_at(0, "a", 10, 1, 0, 0),
-            Server::test_at(1, "b", 0, 1, 0, 1),
-            Server::test_at(2, "c", 20, 1, 0, 0),
+            ServerState {
+                id: 0,
+                name: "a".to_string(),
+                base_latency_ms: 10,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
+            ServerState {
+                id: 1,
+                name: "b".to_string(),
+                base_latency_ms: 0,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 1,
+                in_flight: 0,
+            },
+            ServerState {
+                id: 2,
+                name: "c".to_string(),
+                base_latency_ms: 20,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
         ];
         let candidates = [0usize, 1];
         let mut rng = rand::rngs::StdRng::seed_from_u64(99);
