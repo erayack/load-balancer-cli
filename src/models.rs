@@ -59,3 +59,21 @@ pub struct SimulationResult {
     pub totals: Vec<ServerSummary>,
     pub tie_break: TieBreak,
 }
+
+#[derive(Clone, Debug)]
+pub enum SimError {
+    Message(String),
+    DuplicateServerName(String),
+}
+
+impl fmt::Display for SimError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SimError::Message(message) => write!(f, "{}", message),
+            SimError::DuplicateServerName(name) => {
+                write!(f, "duplicate server name '{}'", name)
+            }
+        }
+    }
+}
+use std::fmt;
