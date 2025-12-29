@@ -105,6 +105,7 @@ pub struct Assignment {
     pub server_id: usize,
     pub server_name: String,
     pub score: Option<u64>,
+    pub started_at: u64,
     pub completed_at: u64,
 }
 

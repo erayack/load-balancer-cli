@@ -56,11 +56,9 @@ pub(crate) fn run_simulation(
             if in_flight_request.completes_at > current_time {
                 break;
             }
-            let completed = in_flight.pop().expect("peeked entry missing");
+            let completed = in_flight.pop().unwrap();
             let server_idx = completed.0.server_id;
-            if servers[server_idx].active_connections > 0 {
-                servers[server_idx].active_connections -= 1;
-            }
+            servers[server_idx].active_connections -= 1;
         }
 
         let (server_idx, score) = match algo {
@@ -80,7 +78,8 @@ pub(crate) fn run_simulation(
 
         servers[server_idx].active_connections += 1;
         servers[server_idx].pick_count += 1;
-        let completed_at = current_time + servers[server_idx].base_latency_ms;
+        let started_at = current_time;
+        let completed_at = started_at + servers[server_idx].base_latency_ms;
         in_flight.push(Reverse(InFlight {
             completes_at: completed_at,
             server_id: server_idx,
@@ -91,6 +90,7 @@ pub(crate) fn run_simulation(
             server_id: servers[server_idx].id,
             server_name: servers[server_idx].name.clone(),
             score,
+            started_at,
             completed_at,
         });
     }
@@ -102,8 +102,7 @@ pub(crate) fn run_simulation(
             .get(&assignment.server_id)
             .expect("assignment server_id missing from servers");
         counts[*idx] += 1;
-        let start_time = assignment.request_id as u64 - 1;
-        total_response_ms[*idx] += assignment.completed_at - start_time;
+        total_response_ms[*idx] += assignment.completed_at - assignment.started_at;
     }
 
     let totals = servers
@@ -139,10 +138,6 @@ fn pick_round_robin(next_idx: &mut usize, len: usize) -> usize {
 
 fn pick_weighted_round_robin(next_idx: &mut usize, servers: &[Server]) -> usize {
     let total_weight: u64 = servers.iter().map(|server| server.weight as u64).sum();
-    if total_weight == 0 {
-        return 0;
-    }
-
     let target = (*next_idx as u64) % total_weight;
     *next_idx = (*next_idx + 1) % (total_weight as usize);
 
@@ -194,10 +189,6 @@ fn pick_least_response_time(servers: &[Server], rng: Option<&mut StdRng>) -> (us
 }
 
 fn pick_index(candidates: &[usize], rng: Option<&mut StdRng>) -> usize {
-    if candidates.is_empty() {
-        return 0;
-    }
-
     match rng {
         Some(rng) => {
             let choice = rng.gen_range(0..candidates.len());
@@ -308,16 +299,26 @@ mod tests {
     }
 
     #[test]
-    fn assignments_include_completion_times() {
-        let servers = vec![Server::test_at(0, "api", 5, 0, 0)];
+    fn assignments_include_response_time_metrics() {
+        let servers = vec![Server::test_at(0, "api", 5, 1, 0, 0)];
         let result = run_simulation(servers, Algorithm::RoundRobin, 2, TieBreak::Stable)
             .expect("simulation should succeed");
+
+        let started: Vec<u64> = result
+            .assignments
+            .iter()
+            .map(|assignment| assignment.started_at)
+            .collect();
+        assert_eq!(started, vec![0, 1]);
+
         let completed: Vec<u64> = result
             .assignments
             .iter()
             .map(|assignment| assignment.completed_at)
             .collect();
         assert_eq!(completed, vec![5, 6]);
+
+        assert_eq!(result.totals[0].avg_response_ms, 5);
     }
 
     #[test]

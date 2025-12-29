@@ -54,3 +54,7 @@ docs/
 # Override global gitignore for config files
 !.config/
 !.config/nextest.toml
+
+
+.cursor
+.claude
