@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -8,7 +8,42 @@ use crate::models::{AlgoConfig, RequestProfile, ServerConfig, SimConfig, TieBrea
 
 #[derive(Parser, Debug)]
 #[command(name = "load-balancer-cli")]
-pub struct Args {
+pub struct CliArgs {
+    #[command(subcommand)]
+    pub command: Option<Command>,
+    #[arg(long, value_enum)]
+    pub algo: Option<AlgoArg>,
+    #[arg(long)]
+    pub servers: Option<String>,
+    #[arg(long, value_name = "name:latency[:weight]")]
+    pub server: Vec<String>,
+    #[arg(long)]
+    pub requests: Option<usize>,
+    #[arg(long)]
+    pub summary: bool,
+    #[arg(long, value_enum, default_value = "human")]
+    pub format: FormatArg,
+    #[arg(
+        long,
+        help = "Seed tie-breaks for least-connections/response-time; omit for stable input-order tie-breaks"
+    )]
+    pub seed: Option<u64>,
+    #[arg(long)]
+    pub config: Option<PathBuf>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Command {
+    /// Run the load balancer simulation
+    Run(RunArgs),
+    /// List available algorithms
+    ListAlgorithms,
+    /// Show the effective configuration
+    ShowConfig(RunArgs),
+}
+
+#[derive(Parser, Debug)]
+pub struct RunArgs {
     #[arg(long, value_enum)]
     pub algo: Option<AlgoArg>,
     #[arg(long)]
@@ -56,12 +91,32 @@ impl From<AlgoArg> for AlgoConfig {
     }
 }
 
-pub fn parse_args() -> Result<Args> {
-    Args::try_parse().map_err(|e| Error::Cli(e.to_string()))
+pub fn parse_args() -> Result<CliArgs> {
+    CliArgs::try_parse().map_err(|e| Error::Cli(e.to_string()))
 }
 
-pub fn build_config(args: Args) -> Result<(SimConfig, FormatArg)> {
-    let format = format_arg(&args);
+pub fn parse_command() -> Result<Command> {
+    let args = parse_args()?;
+    match args.command {
+        Some(cmd) => Ok(cmd),
+        None => {
+            let run_args = RunArgs {
+                algo: args.algo,
+                servers: args.servers,
+                server: args.server,
+                requests: args.requests,
+                summary: args.summary,
+                format: args.format,
+                seed: args.seed,
+                config: args.config,
+            };
+            Ok(Command::Run(run_args))
+        }
+    }
+}
+
+pub fn build_config_from_run_args(args: RunArgs) -> Result<(SimConfig, FormatArg)> {
+    let format = format_arg_from_run_args(&args);
     let mut config = if let Some(path) = args.config.as_ref() {
         load_config(path)?
     } else {
@@ -78,7 +133,10 @@ pub fn build_config(args: Args) -> Result<(SimConfig, FormatArg)> {
         } else {
             TieBreakConfig::Stable
         };
-        return Ok((create_config(servers, requests, algo, tie_break, args.seed), format));
+        return Ok((
+            create_config(servers, requests, algo, tie_break, args.seed),
+            format,
+        ));
     };
 
     if let Some(algo) = args.algo {
@@ -223,10 +281,42 @@ fn create_config(
     }
 }
 
-fn format_arg(args: &Args) -> FormatArg {
+fn format_arg_from_run_args(args: &RunArgs) -> FormatArg {
     if args.summary {
         FormatArg::Summary
     } else {
         args.format.clone()
     }
+}
+
+pub fn format_config(config: &SimConfig) -> String {
+    let algo_label = config.algo.to_string();
+
+    let requests_label = match &config.requests {
+        RequestProfile::FixedCount(n) => format!("Requests: {}", n),
+        RequestProfile::Poisson { rate, duration_ms } => {
+            format!(
+                "Requests: poisson(rate={}, duration_ms={})",
+                rate, duration_ms
+            )
+        }
+    };
+
+    let tie_break_label = config.tie_break.label_with_seed(config.seed);
+
+    let mut lines = vec![
+        format!("Algorithm: {}", algo_label),
+        requests_label,
+        format!("Tie-break: {}", tie_break_label),
+        "Servers:".to_string(),
+    ];
+
+    for server in &config.servers {
+        lines.push(format!(
+            "- {} (latency: {}ms, weight: {})",
+            server.name, server.base_latency_ms, server.weight
+        ));
+    }
+
+    lines.join("\n") + "\n"
 }

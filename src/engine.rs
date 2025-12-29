@@ -7,7 +7,9 @@ use crate::algorithms::{build_strategy, SelectionContext, SelectionStrategy};
 use crate::error::{Error, Result};
 use crate::events::{Event, Request, ScheduledEvent};
 use crate::models::{RequestProfile, ServerConfig, SimConfig, TieBreakConfig};
-use crate::state::{Assignment, EngineState, RunMetadata, ServerState, ServerSummary, SimulationResult};
+use crate::state::{
+    Assignment, EngineState, RunMetadata, ServerState, ServerSummary, SimulationResult,
+};
 
 pub struct SimulationEngine {
     pub config: SimConfig,
@@ -58,10 +60,9 @@ impl SimulationEngine {
             self.state.time_ms = scheduled.time_ms;
             match scheduled.event {
                 Event::RequestComplete { server_id, .. } => {
-                    if let Some(server) = self.state.servers.get_mut(server_id) {
-                        server.active_connections = server.active_connections.saturating_sub(1);
-                        server.in_flight = server.in_flight.saturating_sub(1);
-                    }
+                    let server = &mut self.state.servers[server_id];
+                    server.active_connections -= 1;
+                    server.in_flight -= 1;
                 }
                 Event::RequestArrival(request) => {
                     let rng: &mut dyn RngCore = match self.config.tie_break {
@@ -278,9 +279,7 @@ impl RngCore for StableRng {
     }
 
     fn fill_bytes(&mut self, dest: &mut [u8]) {
-        for byte in dest.iter_mut() {
-            *byte = 0;
-        }
+        dest.fill(0);
     }
 
     fn try_fill_bytes(&mut self, dest: &mut [u8]) -> std::result::Result<(), rand::Error> {

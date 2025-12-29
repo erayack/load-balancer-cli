@@ -15,6 +15,10 @@ Run a sample simulation:
 
 ```
 cargo run -- --algo round-robin --servers a:10,b:20 --requests 5
+cargo run -- --algo least-connections --servers a:10,b:20 --requests 5 --seed 42
+cargo run -- --algo least-response-time --servers a:10,b:20 --requests 5 --seed 7
+cargo run -- --algo weighted-round-robin --servers a:10:2,b:20:1 --requests 5 --su
+cargo run -- --algo weighted-round-robin --servers a:10:2,b:20:1 --requests 5 --seed 11 --summary
 ```
 
 ## Usage

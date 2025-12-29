@@ -76,7 +76,7 @@ mod tests {
             },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
-        let mut strategy = LeastResponseTimeStrategy::default();
+        let mut strategy = LeastResponseTimeStrategy;
         let ctx = SelectionContext {
             servers: &servers,
             time_ms: 0,
@@ -127,7 +127,7 @@ mod tests {
         };
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(99);
-        let mut strategy = LeastResponseTimeStrategy::default();
+        let mut strategy = LeastResponseTimeStrategy;
         let ctx = SelectionContext {
             servers: &servers,
             time_ms: 0,

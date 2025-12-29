@@ -75,7 +75,7 @@ mod tests {
             },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
-        let mut strategy = LeastConnectionsStrategy::default();
+        let mut strategy = LeastConnectionsStrategy;
         let ctx = SelectionContext {
             servers: &servers,
             time_ms: 0,
@@ -124,7 +124,7 @@ mod tests {
         };
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(42);
-        let mut strategy = LeastConnectionsStrategy::default();
+        let mut strategy = LeastConnectionsStrategy;
         let ctx = SelectionContext {
             servers: &servers,
             time_ms: 0,

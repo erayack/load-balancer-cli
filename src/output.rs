@@ -34,7 +34,7 @@ pub struct JsonFormatter;
 
 impl Formatter for JsonFormatter {
     fn write(&self, result: &SimulationResult) -> String {
-        serde_json::to_string_pretty(result).unwrap_or_else(|_| "{}".to_string())
+        serde_json::to_string_pretty(result).unwrap()
     }
 }
 
