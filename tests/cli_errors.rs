@@ -42,7 +42,7 @@ fn invalid_latency_fails() {
 }
 
 #[test]
-fn duplicate_server_ids_fail() {
+fn duplicate_server_names_fail() {
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
         "--algo",
@@ -54,5 +54,5 @@ fn duplicate_server_ids_fail() {
     ]);
     cmd.assert()
         .failure()
-        .stderr(contains("Error: duplicate server id 0"));
+        .stderr(contains("Error: duplicate server name 'a'"));
 }

@@ -224,7 +224,7 @@ mod tests {
             Server::test_at(1, "b", 10, 1, 0),
             Server::test_at(2, "c", 10, 1, 0),
         ];
-        let candidates = vec![0usize, 1, 2];
+        let candidates = [0usize, 1, 2];
         let mut rng = StdRng::seed_from_u64(42);
         let expected = {
             let choice = rng.gen_range(0..candidates.len());
@@ -242,7 +242,7 @@ mod tests {
             Server::test_at(1, "b", 0, 0, 1),
             Server::test_at(2, "c", 20, 0, 0),
         ];
-        let candidates = vec![0usize, 1];
+        let candidates = [0usize, 1];
         let mut rng = StdRng::seed_from_u64(99);
         let expected = {
             let choice = rng.gen_range(0..candidates.len());

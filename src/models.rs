@@ -5,6 +5,7 @@ pub enum SimError {
     EmptyServers,
     RequestsZero,
     DuplicateServerId(usize),
+    DuplicateServerName(String),
     InvalidServerEntry(String),
     InvalidLatency(String),
     InvalidLatencyValue(String),
@@ -24,6 +25,9 @@ impl fmt::Display for SimError {
             SimError::EmptyServerEntry => write!(f, "servers must not contain empty entries"),
             SimError::RequestsZero => write!(f, "requests must be greater than 0"),
             SimError::DuplicateServerId(id) => write!(f, "duplicate server id {}", id),
+            SimError::DuplicateServerName(name) => {
+                write!(f, "duplicate server name '{}'", name)
+            }
             SimError::InvalidServerEntry(entry) => write!(
                 f,
                 "invalid server entry '{}': expected name:latency_ms",

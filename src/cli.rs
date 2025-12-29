@@ -1,4 +1,5 @@
 use clap::{Parser, ValueEnum};
+use std::collections::HashSet;
 
 use crate::models::{Algorithm, Server, SimError, SimResult};
 
@@ -43,14 +44,13 @@ pub fn parse_args() -> SimResult<Args> {
 
 pub fn parse_servers(input: &str) -> SimResult<Vec<Server>> {
     let mut servers = Vec::new();
-    let mut name_to_id: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-    let mut next_id = 0usize;
+    let mut names = HashSet::new();
 
     if input.trim().is_empty() {
         return Err(SimError::EmptyServersInput);
     }
 
-    for entry in input.split(',') {
+    for (id, entry) in input.split(',').enumerate() {
         let trimmed = entry.trim();
         if trimmed.is_empty() {
             return Err(SimError::EmptyServerEntry);
@@ -66,22 +66,17 @@ pub fn parse_servers(input: &str) -> SimResult<Vec<Server>> {
             return Err(SimError::InvalidServerEntry(trimmed.to_string()));
         }
 
+        if names.contains(name) {
+            return Err(SimError::DuplicateServerName(name.to_string()));
+        }
+        names.insert(name.to_string());
+
         let latency_ms: u64 = latency_str
             .parse()
             .map_err(|_| SimError::InvalidLatency(trimmed.to_string()))?;
         if latency_ms == 0 {
             return Err(SimError::InvalidLatencyValue(trimmed.to_string()));
         }
-
-        let id = match name_to_id.get(name) {
-            Some(existing) => *existing,
-            None => {
-                let id = next_id;
-                next_id += 1;
-                name_to_id.insert(name, id);
-                id
-            }
-        };
 
         servers.push(Server {
             id,
