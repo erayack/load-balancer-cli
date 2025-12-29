@@ -3,19 +3,24 @@ pub struct Server {
     pub id: usize,
     pub name: String,
     pub base_latency_ms: u64,
-    #[allow(dead_code)]
     pub active_connections: u32,
     pub pick_count: u32,
 }
 
 #[cfg(test)]
 impl Server {
-    pub fn test_at(index: usize, name: &str, latency: u64, pick_count: u32) -> Self {
+    pub fn test_at(
+        index: usize,
+        name: &str,
+        latency: u64,
+        active_connections: u32,
+        pick_count: u32,
+    ) -> Self {
         Self {
             id: index,
             name: name.to_string(),
             base_latency_ms: latency,
-            active_connections: 0,
+            active_connections,
             pick_count,
         }
     }

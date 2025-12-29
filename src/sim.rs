@@ -1,7 +1,29 @@
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
 
 use crate::models::{Algorithm, Assignment, Server, SimulationResult};
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct InFlight {
+    completes_at: u64,
+    server_id: usize,
+}
+
+impl Ord for InFlight {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.completes_at
+            .cmp(&other.completes_at)
+            .then_with(|| self.server_id.cmp(&other.server_id))
+    }
+}
+
+impl PartialOrd for InFlight {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
 pub fn run_simulation(
     mut servers: Vec<Server>,
@@ -12,8 +34,21 @@ pub fn run_simulation(
     let mut assignments = Vec::with_capacity(request_count);
     let mut rng = seed.map(StdRng::seed_from_u64);
     let mut next_idx = 0usize;
+    let mut in_flight: BinaryHeap<Reverse<InFlight>> = BinaryHeap::new();
 
-    for request_id in 1..=request_count {
+    for (current_time, request_id) in (1..=request_count).enumerate() {
+        let current_time = current_time as u64;
+        while let Some(Reverse(in_flight_request)) = in_flight.peek() {
+            if in_flight_request.completes_at > current_time {
+                break;
+            }
+            let completed = in_flight.pop().expect("peeked entry missing");
+            let server_idx = completed.0.server_id;
+            if servers[server_idx].active_connections > 0 {
+                servers[server_idx].active_connections -= 1;
+            }
+        }
+
         let (server_idx, score) = match algo {
             Algorithm::RoundRobin => (pick_round_robin(&mut next_idx, servers.len()), None),
             Algorithm::LeastConnections => {
@@ -26,8 +61,12 @@ pub fn run_simulation(
             }
         };
 
-        // Cumulative pick tracking for LC/LRT; active_connections is reserved for future duration modeling.
+        servers[server_idx].active_connections += 1;
         servers[server_idx].pick_count += 1;
+        in_flight.push(Reverse(InFlight {
+            completes_at: current_time + servers[server_idx].base_latency_ms,
+            server_id: server_idx,
+        }));
 
         assignments.push(Assignment {
             request_id,
@@ -44,7 +83,7 @@ pub fn run_simulation(
 
     let totals = servers
         .iter()
-        .zip(counts.into_iter())
+        .zip(counts)
         .map(|(server, count)| (server.name.clone(), count))
         .collect();
 
@@ -65,11 +104,11 @@ fn pick_least_connections(servers: &[Server], rng: Option<&mut StdRng>) -> usize
     let mut candidates = Vec::new();
 
     for (idx, server) in servers.iter().enumerate() {
-        if server.pick_count < min_count {
-            min_count = server.pick_count;
+        if server.active_connections < min_count {
+            min_count = server.active_connections;
             candidates.clear();
             candidates.push(idx);
-        } else if server.pick_count == min_count {
+        } else if server.active_connections == min_count {
             candidates.push(idx);
         }
     }
@@ -124,11 +163,11 @@ mod tests {
     }
 
     #[test]
-    fn least_connections_prefers_lowest_pick_count() {
+    fn least_connections_prefers_lowest_active_connections() {
         let servers = vec![
-            Server::test_at(0, "a", 10, 3),
-            Server::test_at(1, "b", 10, 1),
-            Server::test_at(2, "c", 10, 2),
+            Server::test_at(0, "a", 10, 3, 0),
+            Server::test_at(1, "b", 10, 1, 0),
+            Server::test_at(2, "c", 10, 2, 0),
         ];
         let idx = pick_least_connections(&servers, None);
         assert_eq!(idx, 1);
@@ -137,9 +176,9 @@ mod tests {
     #[test]
     fn least_connections_tiebreaks_stably_without_seed() {
         let servers = vec![
-            Server::test_at(0, "a", 10, 1),
-            Server::test_at(1, "b", 10, 2),
-            Server::test_at(2, "c", 10, 1),
+            Server::test_at(0, "a", 10, 1, 0),
+            Server::test_at(1, "b", 10, 2, 0),
+            Server::test_at(2, "c", 10, 1, 0),
         ];
         let idx = pick_least_connections(&servers, None);
         assert_eq!(idx, 0);
@@ -148,13 +187,28 @@ mod tests {
     #[test]
     fn least_response_time_prefers_lowest_score() {
         let servers = vec![
-            Server::test_at(0, "a", 30, 0),
-            Server::test_at(1, "b", 10, 2),
-            Server::test_at(2, "c", 20, 0),
+            Server::test_at(0, "a", 30, 0, 0),
+            Server::test_at(1, "b", 10, 0, 2),
+            Server::test_at(2, "c", 20, 0, 0),
         ];
         let (idx, score) = pick_least_response_time(&servers, None);
         assert_eq!(idx, 2);
         assert_eq!(score, 20);
+    }
+
+    #[test]
+    fn least_connections_accounts_for_completed_requests() {
+        let servers = vec![
+            Server::test_at(0, "fast", 1, 0, 0),
+            Server::test_at(1, "slow", 100, 0, 0),
+        ];
+        let result = run_simulation(servers, Algorithm::LeastConnections, 2, None);
+        let assigned = result
+            .assignments
+            .iter()
+            .map(|assignment| assignment.server_name.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(assigned, vec!["fast", "fast"]);
     }
 
     #[test]
