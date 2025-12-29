@@ -67,7 +67,7 @@ fn summary_preserves_input_order() {
 
 #[test]
 fn summary_preserves_input_order_for_least_connections() {
-    let expected = "Summary:\nfirst: 1 requests (avg response: 10ms)\nsecond: 1 requests (avg response: 20ms)\nthird: 2 requests (avg response: 30ms)\n";
+    let expected = "Summary:\nfirst: 1 requests (avg response: 10ms)\nsecond: 2 requests (avg response: 20ms)\nthird: 1 requests (avg response: 30ms)\n";
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([

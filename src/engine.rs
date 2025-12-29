@@ -1,127 +1,148 @@
 use rand::rngs::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, RngCore, SeedableRng};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashSet};
 
-use crate::algorithms::{
-    pick_least_connections, pick_least_response_time, pick_round_robin, pick_weighted_round_robin,
-};
+use crate::algorithms::{build_strategy, SelectionContext, SelectionStrategy};
 use crate::error::{SimError, SimResult};
-use crate::models::{AlgoConfig, RequestProfile, ServerConfig, SimConfig, TieBreakConfig};
-use crate::state::{Assignment, Request, ServerState, ServerSummary, SimulationResult};
+use crate::events::{Event, Request, ScheduledEvent};
+use crate::models::{RequestProfile, ServerConfig, SimConfig, TieBreakConfig};
+use crate::state::{Assignment, EngineState, ServerState, ServerSummary, SimulationResult};
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct InFlight {
-    completes_at: u64,
-    server_id: usize,
+pub struct SimulationEngine {
+    pub config: SimConfig,
+    pub state: EngineState,
+    pub strategy: Box<dyn SelectionStrategy>,
+    pub rng: StdRng,
 }
 
-impl Ord for InFlight {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        self.completes_at
-            .cmp(&other.completes_at)
-            .then_with(|| self.server_id.cmp(&other.server_id))
+impl SimulationEngine {
+    pub fn new(config: SimConfig, strategy: Box<dyn SelectionStrategy>) -> Self {
+        let seed = match config.tie_break {
+            TieBreakConfig::Seeded => config.seed.unwrap_or(0),
+            TieBreakConfig::Stable => 0,
+        };
+        let rng = StdRng::seed_from_u64(seed);
+        let state = EngineState {
+            time_ms: 0,
+            servers: Vec::new(),
+            assignments: Vec::new(),
+        };
+
+        Self {
+            config,
+            state,
+            strategy,
+            rng,
+        }
     }
-}
 
-impl PartialOrd for InFlight {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
+    pub fn run(&mut self) -> SimResult<SimulationResult> {
+        validate_config(&self.config)?;
+        let requests = build_requests(&self.config.requests, self.config.seed)?;
+
+        self.state.servers = init_server_state(&self.config.servers);
+        self.state.assignments = Vec::with_capacity(requests.len());
+
+        let mut events: BinaryHeap<Reverse<ScheduledEvent>> = BinaryHeap::new();
+        for request in requests {
+            events.push(Reverse(ScheduledEvent::new(
+                request.arrival_time_ms,
+                Event::RequestArrival(request),
+            )));
+        }
+
+        let mut stable_rng = StableRng;
+
+        while let Some(Reverse(scheduled)) = events.pop() {
+            self.state.time_ms = scheduled.time_ms;
+            match scheduled.event {
+                Event::RequestComplete { server_id, .. } => {
+                    if let Some(server) = self.state.servers.get_mut(server_id) {
+                        server.active_connections = server.active_connections.saturating_sub(1);
+                        server.in_flight = server.in_flight.saturating_sub(1);
+                    }
+                }
+                Event::RequestArrival(request) => {
+                    let rng: &mut dyn RngCore = match self.config.tie_break {
+                        TieBreakConfig::Stable => &mut stable_rng,
+                        TieBreakConfig::Seeded => &mut self.rng,
+                    };
+                    let ctx = SelectionContext {
+                        servers: &self.state.servers,
+                        time_ms: self.state.time_ms,
+                        rng,
+                    };
+                    let selection = self.strategy.select(&ctx);
+                    let server_idx = selection.server_id;
+
+                    let server = &mut self.state.servers[server_idx];
+                    server.active_connections += 1;
+                    server.pick_count += 1;
+                    server.in_flight += 1;
+
+                    let started_at = self.state.time_ms;
+                    let completed_at = started_at + server.base_latency_ms;
+                    events.push(Reverse(ScheduledEvent::new(
+                        completed_at,
+                        Event::RequestComplete {
+                            server_id: server_idx,
+                            request_id: request.id,
+                        },
+                    )));
+
+                    self.state.assignments.push(Assignment {
+                        request_id: request.id,
+                        server_id: server_idx,
+                        started_at,
+                        completed_at,
+                        score: selection.score,
+                    });
+                }
+            }
+        }
+
+        let mut counts = vec![0u32; self.state.servers.len()];
+        let mut total_response_ms = vec![0u64; self.state.servers.len()];
+        for assignment in &self.state.assignments {
+            let idx = assignment.server_id;
+            counts[idx] += 1;
+            total_response_ms[idx] += assignment.completed_at - assignment.started_at;
+        }
+
+        let totals = self
+            .state
+            .servers
+            .iter()
+            .enumerate()
+            .map(|(idx, server)| {
+                let count = counts[idx];
+                let avg_response_ms = if count == 0 {
+                    0
+                } else {
+                    total_response_ms[idx] / count as u64
+                };
+                ServerSummary {
+                    name: server.name.clone(),
+                    requests: count,
+                    avg_response_ms,
+                }
+            })
+            .collect();
+
+        Ok(SimulationResult {
+            assignments: self.state.assignments.clone(),
+            totals,
+            tie_break: self.config.tie_break.clone(),
+            seed: self.config.seed,
+        })
     }
 }
 
 pub fn run_simulation(config: &SimConfig) -> SimResult<SimulationResult> {
-    validate_config(config)?;
-    let requests = build_requests(&config.requests, config.seed)?;
-    let mut servers = init_server_state(&config.servers);
-    let mut assignments = Vec::with_capacity(requests.len());
-    let mut rng = match config.tie_break {
-        TieBreakConfig::Seeded => Some(StdRng::seed_from_u64(config.seed.unwrap())),
-        TieBreakConfig::Stable => None,
-    };
-    let mut next_idx = 0usize;
-    let mut in_flight: BinaryHeap<Reverse<InFlight>> = BinaryHeap::new();
-
-    for request in requests {
-        let current_time = request.arrival_ms;
-        while let Some(Reverse(in_flight_request)) = in_flight.peek() {
-            if in_flight_request.completes_at > current_time {
-                break;
-            }
-            let completed = in_flight.pop().unwrap();
-            let server_idx = completed.0.server_id;
-            servers[server_idx].active_connections -= 1;
-            servers[server_idx].in_flight -= 1;
-        }
-
-        let (server_idx, score) = match config.algo {
-            AlgoConfig::RoundRobin => (pick_round_robin(&mut next_idx, servers.len()), None),
-            AlgoConfig::WeightedRoundRobin => (
-                pick_weighted_round_robin(&mut next_idx, &config.servers),
-                None,
-            ),
-            AlgoConfig::LeastConnections => {
-                let idx = pick_least_connections(&servers, rng.as_mut());
-                (idx, None)
-            }
-            AlgoConfig::LeastResponseTime => {
-                let (idx, score) =
-                    pick_least_response_time(&config.servers, &servers, rng.as_mut());
-                (idx, Some(score))
-            }
-        };
-
-        servers[server_idx].active_connections += 1;
-        servers[server_idx].pick_count += 1;
-        servers[server_idx].in_flight += 1;
-        let started_at = current_time;
-        let completed_at = started_at + config.servers[server_idx].base_latency_ms;
-        in_flight.push(Reverse(InFlight {
-            completes_at: completed_at,
-            server_id: server_idx,
-        }));
-
-        assignments.push(Assignment {
-            request_id: request.id,
-            server_id: servers[server_idx].id,
-            score,
-            started_at,
-            completed_at,
-        });
-    }
-
-    let mut counts = vec![0u32; servers.len()];
-    let mut total_response_ms = vec![0u64; servers.len()];
-    for assignment in &assignments {
-        let idx = assignment.server_id;
-        counts[idx] += 1;
-        total_response_ms[idx] += assignment.completed_at - assignment.started_at;
-    }
-
-    let totals = servers
-        .iter()
-        .enumerate()
-        .map(|(idx, server)| {
-            let count = counts[idx];
-            let avg_response_ms = if count == 0 {
-                0
-            } else {
-                total_response_ms[idx] / count as u64
-            };
-            ServerSummary {
-                name: server.name.clone(),
-                requests: count,
-                avg_response_ms,
-            }
-        })
-        .collect();
-
-    Ok(SimulationResult {
-        assignments,
-        totals,
-        tie_break: config.tie_break.clone(),
-        seed: config.seed,
-    })
+    let strategy = build_strategy(config.algo.clone());
+    let mut engine = SimulationEngine::new(config.clone(), strategy);
+    engine.run()
 }
 
 fn validate_config(config: &SimConfig) -> SimResult<()> {
@@ -174,7 +195,7 @@ fn build_requests(profile: &RequestProfile, seed: Option<u64>) -> SimResult<Vec<
             Ok((0..*count)
                 .map(|idx| Request {
                     id: idx + 1,
-                    arrival_ms: idx as u64,
+                    arrival_time_ms: idx as u64,
                 })
                 .collect())
         }
@@ -203,7 +224,7 @@ fn build_requests(profile: &RequestProfile, seed: Option<u64>) -> SimResult<Vec<
                 }
                 requests.push(Request {
                     id,
-                    arrival_ms: time.floor() as u64,
+                    arrival_time_ms: time.floor() as u64,
                 });
                 id += 1;
             }
@@ -224,6 +245,8 @@ fn init_server_state(servers: &[ServerConfig]) -> Vec<ServerState> {
         .map(|(id, server)| ServerState {
             id,
             name: server.name.clone(),
+            base_latency_ms: server.base_latency_ms,
+            weight: server.weight,
             active_connections: 0,
             pick_count: 0,
             in_flight: 0,
@@ -231,9 +254,33 @@ fn init_server_state(servers: &[ServerConfig]) -> Vec<ServerState> {
         .collect()
 }
 
+struct StableRng;
+
+impl RngCore for StableRng {
+    fn next_u32(&mut self) -> u32 {
+        0
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        0
+    }
+
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        for byte in dest.iter_mut() {
+            *byte = 0;
+        }
+    }
+
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::AlgoConfig;
 
     fn config_with_servers(servers: Vec<ServerConfig>) -> SimConfig {
         SimConfig {
@@ -272,6 +319,48 @@ mod tests {
             .map(|assignment| assignment.server_id)
             .collect::<Vec<_>>();
         assert_eq!(assigned, vec![0, 0]);
+    }
+
+    #[test]
+    fn seeded_tiebreak_is_deterministic_in_engine() {
+        let config = SimConfig {
+            servers: vec![
+                ServerConfig {
+                    name: "a".to_string(),
+                    base_latency_ms: 1,
+                    weight: 1,
+                },
+                ServerConfig {
+                    name: "b".to_string(),
+                    base_latency_ms: 1,
+                    weight: 1,
+                },
+                ServerConfig {
+                    name: "c".to_string(),
+                    base_latency_ms: 1,
+                    weight: 1,
+                },
+            ],
+            requests: RequestProfile::FixedCount(3),
+            algo: AlgoConfig::LeastConnections,
+            tie_break: TieBreakConfig::Seeded,
+            seed: Some(42),
+        };
+        let result_a = run_simulation(&config).expect("simulation should succeed");
+        let result_b = run_simulation(&config).expect("simulation should succeed");
+
+        let actual = result_a
+            .assignments
+            .iter()
+            .map(|assignment| assignment.server_id)
+            .collect::<Vec<_>>();
+        let expected = result_b
+            .assignments
+            .iter()
+            .map(|assignment| assignment.server_id)
+            .collect::<Vec<_>>();
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
