@@ -2,7 +2,8 @@ use predicates::str::diff;
 
 #[test]
 fn summary_round_robin_is_stable() {
-    let expected = "Summary:\na: 2 requests\nb: 1 requests\n";
+    let expected =
+        "Summary:\na: 2 requests (avg response: 10ms)\nb: 1 requests (avg response: 20ms)\n";
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
@@ -21,7 +22,8 @@ fn summary_round_robin_is_stable() {
 
 #[test]
 fn summary_least_response_time_is_stable() {
-    let expected = "Summary:\nfast: 2 requests\nslow: 0 requests\n";
+    let expected =
+        "Summary:\nfast: 2 requests (avg response: 10ms)\nslow: 0 requests (avg response: 0ms)\n";
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
@@ -40,7 +42,7 @@ fn summary_least_response_time_is_stable() {
 
 #[test]
 fn summary_preserves_input_order() {
-    let expected = "Summary:\nz: 1 requests\na: 0 requests\nm: 0 requests\n";
+    let expected = "Summary:\nz: 1 requests (avg response: 10ms)\na: 0 requests (avg response: 0ms)\nm: 0 requests (avg response: 0ms)\n";
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
@@ -57,7 +59,7 @@ fn summary_preserves_input_order() {
 
 #[test]
 fn summary_preserves_input_order_for_least_connections() {
-    let expected = "Summary:\nfirst: 1 requests\nsecond: 1 requests\nthird: 2 requests\n";
+    let expected = "Summary:\nfirst: 1 requests (avg response: 10ms)\nsecond: 1 requests (avg response: 20ms)\nthird: 2 requests (avg response: 30ms)\n";
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
     cmd.args([
@@ -82,8 +84,8 @@ fn full_output_least_response_time_includes_scores() {
         "Request 2 -> b (score: 10ms)\n",
         "Request 3 -> a (score: 20ms)\n",
         "Summary:\n",
-        "a: 2 requests\n",
-        "b: 1 requests\n",
+        "a: 2 requests (avg response: 10ms)\n",
+        "b: 1 requests (avg response: 10ms)\n",
     );
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
@@ -108,8 +110,8 @@ fn full_output_round_robin_omits_scores() {
         "Request 2 -> b\n",
         "Request 3 -> a\n",
         "Summary:\n",
-        "a: 2 requests\n",
-        "b: 1 requests\n",
+        "a: 2 requests (avg response: 10ms)\n",
+        "b: 1 requests (avg response: 20ms)\n",
     );
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");

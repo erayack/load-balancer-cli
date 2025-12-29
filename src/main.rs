@@ -54,6 +54,9 @@ fn run() -> SimResult<()> {
 fn print_summary(result: &SimulationResult) {
     println!("Summary:");
     for summary in &result.totals {
-        println!("{}: {} requests", summary.name, summary.requests);
+        println!(
+            "{}: {} requests (avg response: {}ms)",
+            summary.name, summary.requests, summary.avg_response_ms
+        );
     }
 }

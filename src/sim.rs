@@ -80,8 +80,9 @@ pub(crate) fn run_simulation(
 
         servers[server_idx].active_connections += 1;
         servers[server_idx].pick_count += 1;
+        let completed_at = current_time + servers[server_idx].base_latency_ms;
         in_flight.push(Reverse(InFlight {
-            completes_at: current_time + servers[server_idx].base_latency_ms,
+            completes_at: completed_at,
             server_id: server_idx,
         }));
 
@@ -90,23 +91,36 @@ pub(crate) fn run_simulation(
             server_id: servers[server_idx].id,
             server_name: servers[server_idx].name.clone(),
             score,
+            completed_at,
         });
     }
 
     let mut counts = vec![0u32; servers.len()];
+    let mut total_response_ms = vec![0u64; servers.len()];
     for assignment in &assignments {
         let idx = id_to_index
             .get(&assignment.server_id)
             .expect("assignment server_id missing from servers");
         counts[*idx] += 1;
+        let start_time = assignment.request_id as u64 - 1;
+        total_response_ms[*idx] += assignment.completed_at - start_time;
     }
 
     let totals = servers
         .iter()
-        .zip(counts)
-        .map(|(server, count)| ServerSummary {
-            name: server.name.clone(),
-            requests: count,
+        .enumerate()
+        .map(|(idx, server)| {
+            let count = counts[idx];
+            let avg_response_ms = if count == 0 {
+                0
+            } else {
+                total_response_ms[idx] / count as u64
+            };
+            ServerSummary {
+                name: server.name.clone(),
+                requests: count,
+                avg_response_ms,
+            }
         })
         .collect();
 
@@ -291,6 +305,19 @@ mod tests {
             .map(|assignment| assignment.server_name.as_str())
             .collect::<Vec<_>>();
         assert_eq!(assigned, vec!["fast", "fast"]);
+    }
+
+    #[test]
+    fn assignments_include_completion_times() {
+        let servers = vec![Server::test_at(0, "api", 5, 0, 0)];
+        let result = run_simulation(servers, Algorithm::RoundRobin, 2, TieBreak::Stable)
+            .expect("simulation should succeed");
+        let completed: Vec<u64> = result
+            .assignments
+            .iter()
+            .map(|assignment| assignment.completed_at)
+            .collect();
+        assert_eq!(completed, vec![5, 6]);
     }
 
     #[test]

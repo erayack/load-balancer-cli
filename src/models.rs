@@ -105,12 +105,14 @@ pub struct Assignment {
     pub server_id: usize,
     pub server_name: String,
     pub score: Option<u64>,
+    pub completed_at: u64,
 }
 
 #[derive(Clone, Debug)]
 pub struct ServerSummary {
     pub name: String,
     pub requests: u32,
+    pub avg_response_ms: u64,
 }
 
 #[derive(Clone, Debug)]
