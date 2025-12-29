@@ -4,9 +4,18 @@ use serde::Serialize;
 pub struct ServerState {
     pub id: usize,
     pub name: String,
+    pub base_latency_ms: u64,
+    pub weight: u32,
     pub active_connections: u32,
     pub pick_count: u32,
     pub in_flight: u32,
+}
+
+#[derive(Clone, Debug)]
+pub struct EngineState {
+    pub time_ms: u64,
+    pub servers: Vec<ServerState>,
+    pub assignments: Vec<Assignment>,
 }
 
 #[derive(Clone, Debug)]

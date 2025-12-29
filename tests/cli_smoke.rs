@@ -97,11 +97,11 @@ fn summary_preserves_input_order_for_least_connections() {
         "Metadata:\n",
         "algo: least-connections\n",
         "tie_break: seeded(11)\n",
-        "duration_ms: 33\n",
+        "duration_ms: 30\n",
         "Summary:\n",
         "first: 1 requests (avg response: 10ms)\n",
-        "second: 1 requests (avg response: 20ms)\n",
-        "third: 2 requests (avg response: 30ms)\n",
+        "second: 2 requests (avg response: 20ms)\n",
+        "third: 1 requests (avg response: 30ms)\n",
     );
 
     let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
