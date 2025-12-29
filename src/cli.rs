@@ -1,6 +1,7 @@
 use clap::{Parser, ValueEnum};
+use std::collections::HashSet;
 
-use crate::models::{Algorithm, Server};
+use crate::models::{Algorithm, Server, SimError};
 
 #[derive(Parser, Debug)]
 #[command(name = "load-balancer-cli")]
@@ -37,57 +38,56 @@ impl From<AlgoArg> for Algorithm {
     }
 }
 
-pub fn parse_args() -> Result<Args, String> {
-    Args::try_parse().map_err(|e| e.to_string())
+pub fn parse_args() -> Result<Args, SimError> {
+    Args::try_parse().map_err(|e| SimError::Message(e.to_string()))
 }
 
-pub fn parse_servers(input: &str) -> Result<Vec<Server>, String> {
+pub fn parse_servers(input: &str) -> Result<Vec<Server>, SimError> {
     let mut servers = Vec::new();
-    let mut name_to_id: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-    let mut next_id = 0usize;
+    let mut names = HashSet::new();
 
     if input.trim().is_empty() {
-        return Err("servers must not be empty".to_string());
+        return Err(SimError::Message("servers must not be empty".to_string()));
     }
 
-    for entry in input.split(',') {
+    for (id, entry) in input.split(',').enumerate() {
         let trimmed = entry.trim();
         if trimmed.is_empty() {
-            return Err("servers must not contain empty entries".to_string());
+            return Err(SimError::Message(
+                "servers must not contain empty entries".to_string(),
+            ));
         }
 
         let mut parts = trimmed.split(':');
         let name = parts.next().unwrap_or("").trim();
         let latency_str = parts.next().unwrap_or("").trim();
         if parts.next().is_some() {
-            return Err(format!(
+            return Err(SimError::Message(format!(
                 "invalid server entry '{}': expected name:latency_ms",
                 trimmed
-            ));
+            )));
         }
         if name.is_empty() || latency_str.is_empty() {
-            return Err(format!(
+            return Err(SimError::Message(format!(
                 "invalid server entry '{}': expected name:latency_ms",
                 trimmed
-            ));
+            )));
         }
+
+        if names.contains(name) {
+            return Err(SimError::DuplicateServerName(name.to_string()));
+        }
+        names.insert(name.to_string());
 
         let latency_ms: u64 = latency_str
             .parse()
-            .map_err(|_| format!("invalid latency in '{}'", trimmed))?;
+            .map_err(|_| SimError::Message(format!("invalid latency in '{}'", trimmed)))?;
         if latency_ms == 0 {
-            return Err(format!("latency must be > 0 in '{}'", trimmed));
+            return Err(SimError::Message(format!(
+                "latency must be > 0 in '{}'",
+                trimmed
+            )));
         }
-
-        let id = match name_to_id.get(name) {
-            Some(existing) => *existing,
-            None => {
-                let id = next_id;
-                next_id += 1;
-                name_to_id.insert(name, id);
-                id
-            }
-        };
 
         servers.push(Server {
             id,
@@ -139,24 +139,24 @@ mod tests {
     #[test]
     fn parse_servers_rejects_trailing_commas() {
         let err = parse_servers("a:10,").unwrap_err();
-        assert_eq!(err, "servers must not contain empty entries");
+        assert_eq!(err.to_string(), "servers must not contain empty entries");
     }
 
     #[test]
     fn parse_servers_rejects_empty_segments() {
         let err = parse_servers("a:10,,b:20").unwrap_err();
-        assert_eq!(err, "servers must not contain empty entries");
+        assert_eq!(err.to_string(), "servers must not contain empty entries");
     }
 
     #[test]
     fn parse_servers_rejects_comma_only_input() {
         let err = parse_servers(",").unwrap_err();
-        assert_eq!(err, "servers must not contain empty entries");
+        assert_eq!(err.to_string(), "servers must not contain empty entries");
     }
 
     #[test]
     fn parse_servers_rejects_whitespace_only_input() {
         let err = parse_servers(" ").unwrap_err();
-        assert_eq!(err, "servers must not be empty");
+        assert_eq!(err.to_string(), "servers must not be empty");
     }
 }

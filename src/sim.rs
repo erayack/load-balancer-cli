@@ -3,7 +3,9 @@ use rand::{Rng, SeedableRng};
 use std::cmp::Reverse;
 use std::collections::{BinaryHeap, HashMap};
 
-use crate::models::{Algorithm, Assignment, Server, ServerSummary, SimulationResult, TieBreak};
+use crate::models::{
+    Algorithm, Assignment, Server, ServerSummary, SimError, SimulationResult, TieBreak,
+};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct InFlight {
@@ -30,14 +32,17 @@ pub(crate) fn run_simulation(
     algo: Algorithm,
     request_count: usize,
     tie_break: TieBreak,
-) -> Result<SimulationResult, String> {
+) -> Result<SimulationResult, SimError> {
     if servers.is_empty() {
-        return Err("servers must not be empty".to_string());
+        return Err(SimError::Message("servers must not be empty".to_string()));
     }
     let mut id_to_index = HashMap::new();
     for (idx, server) in servers.iter().enumerate() {
         if id_to_index.insert(server.id, idx).is_some() {
-            return Err(format!("duplicate server id {}", server.id));
+            return Err(SimError::Message(format!(
+                "duplicate server id {}",
+                server.id
+            )));
         }
     }
     let mut assignments = Vec::with_capacity(request_count);
@@ -222,7 +227,7 @@ mod tests {
             Server::test_at(1, "b", 10, 1, 0),
             Server::test_at(2, "c", 10, 1, 0),
         ];
-        let candidates = vec![0usize, 1, 2];
+        let candidates = [0usize, 1, 2];
         let mut rng = StdRng::seed_from_u64(42);
         let expected = {
             let choice = rng.gen_range(0..candidates.len());
@@ -240,7 +245,7 @@ mod tests {
             Server::test_at(1, "b", 0, 0, 1),
             Server::test_at(2, "c", 20, 0, 0),
         ];
-        let candidates = vec![0usize, 1];
+        let candidates = [0usize, 1];
         let mut rng = StdRng::seed_from_u64(99);
         let expected = {
             let choice = rng.gen_range(0..candidates.len());
