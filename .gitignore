@@ -1,0 +1,56 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+# Note: Cargo.lock is committed for binary projects (like this CLI tool)
+# Uncomment the line below if this becomes a library crate:
+# Cargo.lock
+.cargo/config.toml
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Test output
+*.test
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Coverage reports
+tarpaulin-report.html
+cobertura.xml
+*.gcda
+*.gcno
+lcov.info
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Project-specific
+docs/
+
+# Override global gitignore for config files
+!.config/
+!.config/nextest.toml

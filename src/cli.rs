@@ -1,0 +1,123 @@
+use clap::{Parser, ValueEnum};
+
+use crate::models::{Algorithm, Server};
+
+#[derive(Parser, Debug)]
+#[command(name = "load-balancer-cli")]
+pub struct Args {
+    #[arg(long, value_enum)]
+    pub algo: AlgoArg,
+    #[arg(long)]
+    pub servers: String,
+    #[arg(long)]
+    pub requests: usize,
+    #[arg(long)]
+    pub summary: bool,
+    #[arg(long)]
+    pub seed: Option<u64>,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+pub enum AlgoArg {
+    RoundRobin,
+    LeastConnections,
+    LeastResponseTime,
+}
+
+impl From<AlgoArg> for Algorithm {
+    fn from(value: AlgoArg) -> Self {
+        match value {
+            AlgoArg::RoundRobin => Algorithm::RoundRobin,
+            AlgoArg::LeastConnections => Algorithm::LeastConnections,
+            AlgoArg::LeastResponseTime => Algorithm::LeastResponseTime,
+        }
+    }
+}
+
+pub fn parse_args() -> Result<Args, String> {
+    Args::try_parse().map_err(|e| e.to_string())
+}
+
+pub fn parse_servers(input: &str) -> Result<Vec<Server>, String> {
+    let mut servers = Vec::new();
+
+    if input.trim().is_empty() {
+        return Err("servers must not be empty".to_string());
+    }
+
+    for (idx, entry) in input.split(',').enumerate() {
+        let trimmed = entry.trim();
+        if trimmed.is_empty() {
+            return Err("servers must not contain empty entries".to_string());
+        }
+
+        let mut parts = trimmed.split(':');
+        let name = parts.next().unwrap_or("").trim();
+        let latency_str = parts.next().unwrap_or("").trim();
+        if parts.next().is_some() {
+            return Err(format!(
+                "invalid server entry '{}': expected name:latency_ms",
+                trimmed
+            ));
+        }
+        if name.is_empty() || latency_str.is_empty() {
+            return Err(format!(
+                "invalid server entry '{}': expected name:latency_ms",
+                trimmed
+            ));
+        }
+
+        let latency_ms: u64 = latency_str
+            .parse()
+            .map_err(|_| format!("invalid latency in '{}'", trimmed))?;
+        if latency_ms == 0 {
+            return Err(format!("latency must be > 0 in '{}'", trimmed));
+        }
+
+        servers.push(Server {
+            id: idx,
+            name: name.to_string(),
+            base_latency_ms: latency_ms,
+            active_connections: 0,
+            pick_count: 0,
+        });
+    }
+
+    Ok(servers)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_servers;
+
+    #[test]
+    fn parse_servers_accepts_valid_list() {
+        let servers = parse_servers("api:10, db:20").unwrap();
+        assert_eq!(servers.len(), 2);
+        assert_eq!(servers[0].id, 0);
+        assert_eq!(servers[0].name, "api");
+        assert_eq!(servers[0].base_latency_ms, 10);
+        assert_eq!(servers[0].active_connections, 0);
+        assert_eq!(servers[0].pick_count, 0);
+        assert_eq!(servers[1].id, 1);
+        assert_eq!(servers[1].name, "db");
+        assert_eq!(servers[1].base_latency_ms, 20);
+    }
+
+    #[test]
+    fn parse_servers_rejects_empty_input() {
+        assert!(parse_servers("").is_err());
+    }
+
+    #[test]
+    fn parse_servers_rejects_invalid_format() {
+        assert!(parse_servers("api").is_err());
+        assert!(parse_servers("api:10:20").is_err());
+    }
+
+    #[test]
+    fn parse_servers_rejects_invalid_latency() {
+        assert!(parse_servers("api:0").is_err());
+        assert!(parse_servers("api:ten").is_err());
+    }
+}
