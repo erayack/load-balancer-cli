@@ -56,7 +56,7 @@ fn run() -> Result<(), String> {
 
 fn print_summary(result: &SimulationResult) {
     println!("Summary:");
-    for (name, count) in &result.totals {
-        println!("{}: {} requests", name, count);
+    for summary in &result.totals {
+        println!("{}: {} requests", summary.name, summary.requests);
     }
 }

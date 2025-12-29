@@ -37,3 +37,39 @@ fn summary_least_response_time_is_stable() {
     ]);
     cmd.assert().success().stdout(diff(expected));
 }
+
+#[test]
+fn summary_preserves_input_order() {
+    let expected = "Summary:\nz: 1 requests\na: 0 requests\nm: 0 requests\n";
+
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    cmd.args([
+        "--algo",
+        "round-robin",
+        "--servers",
+        "z:10,a:20,m:30",
+        "--requests",
+        "1",
+        "--summary",
+    ]);
+    cmd.assert().success().stdout(diff(expected));
+}
+
+#[test]
+fn summary_preserves_input_order_for_least_connections() {
+    let expected = "Summary:\nfirst: 1 requests\nsecond: 1 requests\nthird: 2 requests\n";
+
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    cmd.args([
+        "--algo",
+        "least-connections",
+        "--servers",
+        "first:10,second:20,third:30",
+        "--requests",
+        "4",
+        "--summary",
+        "--seed",
+        "11",
+    ]);
+    cmd.assert().success().stdout(diff(expected));
+}
