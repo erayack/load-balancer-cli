@@ -10,7 +10,6 @@ pub enum SimError {
     InvalidLatency(String),
     InvalidLatencyValue(String),
     EmptyServerEntry,
-    EmptyServersInput,
     Cli(String),
 }
 
@@ -19,9 +18,7 @@ pub type SimResult<T> = Result<T, SimError>;
 impl fmt::Display for SimError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SimError::EmptyServers | SimError::EmptyServersInput => {
-                write!(f, "servers must not be empty")
-            }
+            SimError::EmptyServers => write!(f, "servers must not be empty"),
             SimError::EmptyServerEntry => write!(f, "servers must not contain empty entries"),
             SimError::RequestsZero => write!(f, "requests must be greater than 0"),
             SimError::DuplicateServerId(id) => write!(f, "duplicate server id {}", id),

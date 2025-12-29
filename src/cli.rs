@@ -47,7 +47,7 @@ pub fn parse_servers(input: &str) -> SimResult<Vec<Server>> {
     let mut names = HashSet::new();
 
     if input.trim().is_empty() {
-        return Err(SimError::EmptyServersInput);
+        return Err(SimError::EmptyServers);
     }
 
     for (id, entry) in input.split(',').enumerate() {
@@ -123,6 +123,12 @@ mod tests {
     fn parse_servers_rejects_invalid_latency() {
         assert!(parse_servers("api:0").is_err());
         assert!(parse_servers("api:ten").is_err());
+    }
+
+    #[test]
+    fn parse_servers_rejects_duplicate_names() {
+        let err = parse_servers("api:10, api:20").unwrap_err();
+        assert_eq!(err.to_string(), "duplicate server name 'api'");
     }
 
     #[test]
