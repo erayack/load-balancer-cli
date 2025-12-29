@@ -3,6 +3,10 @@ name = "load-balancer-cli"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "load-balancer-cli"
+path = "src/bin/load-balancer.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 rand = "0.8"
