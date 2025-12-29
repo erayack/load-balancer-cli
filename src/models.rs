@@ -80,6 +80,15 @@ pub enum TieBreak {
     Seeded(u64),
 }
 
+impl fmt::Display for TieBreak {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TieBreak::Stable => write!(f, "stable"),
+            TieBreak::Seeded(seed) => write!(f, "seeded({})", seed),
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Assignment {
     pub request_id: usize,

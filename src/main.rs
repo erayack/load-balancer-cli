@@ -30,10 +30,7 @@ fn run() -> SimResult<()> {
         return Ok(());
     }
 
-    match &result.tie_break {
-        TieBreak::Seeded(seed) => println!("Tie-break: seeded({})", seed),
-        TieBreak::Stable => println!("Tie-break: stable"),
-    }
+    println!("Tie-break: {}", result.tie_break);
 
     for assignment in &result.assignments {
         if let Some(score) = assignment.score {
