@@ -1,7 +1,9 @@
 use clap::{Parser, ValueEnum};
 use std::collections::HashSet;
 
-use crate::models::{Algorithm, Server, SimError, SimResult};
+use crate::algorithms::Algorithm;
+use crate::error::{SimError, SimResult};
+use crate::models::Server;
 
 #[derive(Parser, Debug)]
 #[command(name = "load-balancer-cli")]
