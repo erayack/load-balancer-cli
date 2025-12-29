@@ -216,6 +216,43 @@ mod tests {
     }
 
     #[test]
+    fn least_connections_uses_seeded_tiebreak() {
+        let servers = vec![
+            Server::test_at(0, "a", 10, 1, 0),
+            Server::test_at(1, "b", 10, 1, 0),
+            Server::test_at(2, "c", 10, 1, 0),
+        ];
+        let candidates = vec![0usize, 1, 2];
+        let mut rng = StdRng::seed_from_u64(42);
+        let expected = {
+            let choice = rng.gen_range(0..candidates.len());
+            candidates[choice]
+        };
+        let mut rng = StdRng::seed_from_u64(42);
+        let actual = pick_least_connections(&servers, Some(&mut rng));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn least_response_time_uses_seeded_tiebreak() {
+        let servers = vec![
+            Server::test_at(0, "a", 10, 0, 0),
+            Server::test_at(1, "b", 0, 0, 1),
+            Server::test_at(2, "c", 20, 0, 0),
+        ];
+        let candidates = vec![0usize, 1];
+        let mut rng = StdRng::seed_from_u64(99);
+        let expected = {
+            let choice = rng.gen_range(0..candidates.len());
+            candidates[choice]
+        };
+        let mut rng = StdRng::seed_from_u64(99);
+        let (actual, score) = pick_least_response_time(&servers, Some(&mut rng));
+        assert_eq!(actual, expected);
+        assert_eq!(score, 10);
+    }
+
+    #[test]
     fn least_connections_accounts_for_completed_requests() {
         let servers = vec![
             Server::test_at(0, "fast", 1, 0, 0),

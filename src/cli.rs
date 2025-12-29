@@ -43,12 +43,14 @@ pub fn parse_args() -> Result<Args, String> {
 
 pub fn parse_servers(input: &str) -> Result<Vec<Server>, String> {
     let mut servers = Vec::new();
+    let mut name_to_id: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+    let mut next_id = 0usize;
 
     if input.trim().is_empty() {
         return Err("servers must not be empty".to_string());
     }
 
-    for (idx, entry) in input.split(',').enumerate() {
+    for entry in input.split(',') {
         let trimmed = entry.trim();
         if trimmed.is_empty() {
             return Err("servers must not contain empty entries".to_string());
@@ -77,8 +79,18 @@ pub fn parse_servers(input: &str) -> Result<Vec<Server>, String> {
             return Err(format!("latency must be > 0 in '{}'", trimmed));
         }
 
+        let id = match name_to_id.get(name) {
+            Some(existing) => *existing,
+            None => {
+                let id = next_id;
+                next_id += 1;
+                name_to_id.insert(name, id);
+                id
+            }
+        };
+
         servers.push(Server {
-            id: idx,
+            id,
             name: name.to_string(),
             base_latency_ms: latency_ms,
             active_connections: 0,
@@ -122,5 +134,29 @@ mod tests {
     fn parse_servers_rejects_invalid_latency() {
         assert!(parse_servers("api:0").is_err());
         assert!(parse_servers("api:ten").is_err());
+    }
+
+    #[test]
+    fn parse_servers_rejects_trailing_commas() {
+        let err = parse_servers("a:10,").unwrap_err();
+        assert_eq!(err, "servers must not contain empty entries");
+    }
+
+    #[test]
+    fn parse_servers_rejects_empty_segments() {
+        let err = parse_servers("a:10,,b:20").unwrap_err();
+        assert_eq!(err, "servers must not contain empty entries");
+    }
+
+    #[test]
+    fn parse_servers_rejects_comma_only_input() {
+        let err = parse_servers(",").unwrap_err();
+        assert_eq!(err, "servers must not contain empty entries");
+    }
+
+    #[test]
+    fn parse_servers_rejects_whitespace_only_input() {
+        let err = parse_servers(" ").unwrap_err();
+        assert_eq!(err, "servers must not be empty");
     }
 }

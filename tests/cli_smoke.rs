@@ -73,3 +73,55 @@ fn summary_preserves_input_order_for_least_connections() {
     ]);
     cmd.assert().success().stdout(diff(expected));
 }
+
+#[test]
+fn full_output_least_response_time_includes_scores() {
+    let expected = concat!(
+        "Tie-break: seeded(7)\n",
+        "Request 1 -> a (score: 10ms)\n",
+        "Request 2 -> b (score: 10ms)\n",
+        "Request 3 -> a (score: 20ms)\n",
+        "Summary:\n",
+        "a: 2 requests\n",
+        "b: 1 requests\n",
+    );
+
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    cmd.args([
+        "--algo",
+        "least-response-time",
+        "--servers",
+        "a:10,b:10",
+        "--requests",
+        "3",
+        "--seed",
+        "7",
+    ]);
+    cmd.assert().success().stdout(diff(expected));
+}
+
+#[test]
+fn full_output_round_robin_omits_scores() {
+    let expected = concat!(
+        "Tie-break: seeded(99)\n",
+        "Request 1 -> a\n",
+        "Request 2 -> b\n",
+        "Request 3 -> a\n",
+        "Summary:\n",
+        "a: 2 requests\n",
+        "b: 1 requests\n",
+    );
+
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    cmd.args([
+        "--algo",
+        "round-robin",
+        "--servers",
+        "a:10,b:20",
+        "--requests",
+        "3",
+        "--seed",
+        "99",
+    ]);
+    cmd.assert().success().stdout(diff(expected));
+}
