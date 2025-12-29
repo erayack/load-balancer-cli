@@ -6,7 +6,7 @@ fn requests_zero_fails() {
     cmd.args([
         "--algo",
         "round-robin",
-        "--servers",
+        "--server",
         "a:10",
         "--requests",
         "0",
@@ -31,7 +31,7 @@ fn invalid_latency_fails() {
     cmd.args([
         "--algo",
         "round-robin",
-        "--servers",
+        "--server",
         "api:ten",
         "--requests",
         "1",
@@ -47,8 +47,10 @@ fn duplicate_server_names_fail() {
     cmd.args([
         "--algo",
         "round-robin",
-        "--servers",
-        "a:10,a:20",
+        "--server",
+        "a:10",
+        "--server",
+        "a:20",
         "--requests",
         "1",
     ]);

@@ -4,14 +4,19 @@ use std::fmt;
 pub enum SimError {
     EmptyServers,
     RequestsZero,
-    DuplicateServerId(usize),
     DuplicateServerName(String),
     InvalidServerEntry(String),
     InvalidLatency(String),
     InvalidLatencyValue(String),
     InvalidWeight(String),
     InvalidWeightValue(String),
+    InvalidRequestRate(f64),
+    InvalidRequestDuration(u64),
+    InvalidTieBreakSeed,
     EmptyServerEntry,
+    ConfigIo(String),
+    ConfigParse(String),
+    UnsupportedConfigFormat(String),
     Cli(String),
 }
 
@@ -23,7 +28,6 @@ impl fmt::Display for SimError {
             SimError::EmptyServers => write!(f, "servers must not be empty"),
             SimError::EmptyServerEntry => write!(f, "servers must not contain empty entries"),
             SimError::RequestsZero => write!(f, "requests must be greater than 0"),
-            SimError::DuplicateServerId(id) => write!(f, "duplicate server id {}", id),
             SimError::DuplicateServerName(name) => {
                 write!(f, "duplicate server name '{}'", name)
             }
@@ -39,6 +43,20 @@ impl fmt::Display for SimError {
             SimError::InvalidWeight(entry) => write!(f, "invalid weight in '{}'", entry),
             SimError::InvalidWeightValue(entry) => {
                 write!(f, "weight must be > 0 in '{}'", entry)
+            }
+            SimError::InvalidRequestRate(rate) => {
+                write!(f, "request rate must be > 0 (got {})", rate)
+            }
+            SimError::InvalidRequestDuration(duration) => {
+                write!(f, "request duration must be > 0 (got {}ms)", duration)
+            }
+            SimError::InvalidTieBreakSeed => {
+                write!(f, "tie-break seed required when tie_break is seeded")
+            }
+            SimError::ConfigIo(message) => write!(f, "{}", message),
+            SimError::ConfigParse(message) => write!(f, "{}", message),
+            SimError::UnsupportedConfigFormat(format) => {
+                write!(f, "unsupported config format '{}'", format)
             }
             SimError::Cli(message) => write!(f, "{}", message),
         }
