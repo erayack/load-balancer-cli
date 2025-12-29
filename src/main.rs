@@ -14,9 +14,6 @@ fn main() {
 fn run() -> Result<(), String> {
     let args = cli::parse_args()?;
     let servers = cli::parse_servers(&args.servers)?;
-    if servers.is_empty() {
-        return Err("servers must not be empty".to_string());
-    }
     if args.requests == 0 {
         return Err("requests must be greater than 0".to_string());
     }

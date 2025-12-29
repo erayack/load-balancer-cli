@@ -22,6 +22,7 @@ cargo run -- --algo round-robin --servers a:10,b:20 --requests 5
 - `--servers` expects comma-separated `name:latency_ms` entries, e.g. `api:25,db:40`.
 - `--seed` makes tie-breaks deterministic for least-connections/response-time; omit it to use stable input-order tie-breaks.
 - `--summary` prints only the summary in stable input order for testing.
+- Duplicate server IDs are rejected by the simulator.
 
 Full output includes a single `Tie-break:` line (`stable` or `seeded(<seed>)`) before per-request assignments.
 

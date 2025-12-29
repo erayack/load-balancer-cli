@@ -4,12 +4,12 @@
 - `src/main.rs` is the entry point and wires CLI parsing to the simulation run.
 - `src/cli.rs` defines clap arguments and parses the `--servers` input.
 - `src/models.rs` contains core data types (`Server`, `Algorithm`, results).
-- `src/sim.rs` implements the load-balancer simulation logic.
+- `src/sim.rs` implements the load-balancer simulation logic and validates simulation inputs.
 
 ## Build, Test, and Development Commands
 - `cargo build` builds the CLI binary.
 - `cargo run -- --algo round-robin --servers a:10,b:20 --requests 5` runs a sample simulation.
-- `cargo test` runs unit/integration tests (none exist yet; add as needed).
+- `cargo test` runs unit/integration tests.
 - `cargo fmt` formats Rust code using rustfmt.
 - `cargo clippy` runs lints; fix or justify warnings before PRs.
 
@@ -40,3 +40,4 @@
 - `--servers` expects comma-separated `name:latency_ms` entries, e.g. `api:25,db:40`.
 - `--seed` makes tie-breaks deterministic for least-connections/response-time.
 - `--summary` prints only the summary in stable input order for testing.
+- Duplicate server IDs are rejected by the simulator.
