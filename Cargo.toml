@@ -34,3 +34,7 @@ harness = false
 [[bench]]
 name = "selection_bench"
 harness = false
+
+[[bench]]
+name = "engine_queue_bench"
+harness = false
