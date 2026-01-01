@@ -33,7 +33,7 @@ pub fn build_strategy(algo: AlgoConfig) -> Box<dyn SelectionStrategy> {
     match algo {
         AlgoConfig::RoundRobin => Box::new(RoundRobinStrategy::default()),
         AlgoConfig::WeightedRoundRobin => Box::new(WeightedRoundRobinStrategy::default()),
-        AlgoConfig::LeastConnections => Box::new(LeastConnectionsStrategy),
-        AlgoConfig::LeastResponseTime => Box::new(LeastResponseTimeStrategy),
+        AlgoConfig::LeastConnections => Box::new(LeastConnectionsStrategy::default()),
+        AlgoConfig::LeastResponseTime => Box::new(LeastResponseTimeStrategy::default()),
     }
 }

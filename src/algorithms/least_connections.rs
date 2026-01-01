@@ -3,28 +3,34 @@ use rand::Rng;
 use crate::algorithms::{Selection, SelectionContext, SelectionStrategy};
 
 #[derive(Default)]
-pub struct LeastConnectionsStrategy;
+pub struct LeastConnectionsStrategy {
+    candidates: Vec<usize>,
+}
 
 impl SelectionStrategy for LeastConnectionsStrategy {
     fn select(&mut self, ctx: &mut SelectionContext) -> Selection {
         let mut min_count = u32::MAX;
-        let mut candidates = Vec::new();
+        if self.candidates.capacity() < ctx.servers.len() {
+            self.candidates
+                .reserve(ctx.servers.len() - self.candidates.capacity());
+        }
+        self.candidates.clear();
 
         for (idx, server) in ctx.servers.iter().enumerate() {
             if server.active_connections < min_count {
                 min_count = server.active_connections;
-                candidates.clear();
-                candidates.push(idx);
+                self.candidates.clear();
+                self.candidates.push(idx);
             } else if server.active_connections == min_count {
-                candidates.push(idx);
+                self.candidates.push(idx);
             }
         }
 
-        let choice = if candidates.len() == 1 {
-            candidates[0]
+        let choice = if self.candidates.len() == 1 {
+            self.candidates[0]
         } else {
-            let pick = ctx.rng.gen_range(0..candidates.len());
-            candidates[pick]
+            let pick = ctx.rng.gen_range(0..self.candidates.len());
+            self.candidates[pick]
         };
 
         Selection {
@@ -72,7 +78,7 @@ mod tests {
             },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
-        let mut strategy = LeastConnectionsStrategy;
+        let mut strategy = LeastConnectionsStrategy::default();
         let mut ctx = SelectionContext {
             servers: &servers,
             time_ms: 0,
@@ -121,7 +127,7 @@ mod tests {
         };
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(42);
-        let mut strategy = LeastConnectionsStrategy;
+        let mut strategy = LeastConnectionsStrategy::default();
         let mut ctx = SelectionContext {
             servers: &servers,
             time_ms: 0,

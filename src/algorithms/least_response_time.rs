@@ -3,29 +3,35 @@ use rand::Rng;
 use crate::algorithms::{Selection, SelectionContext, SelectionStrategy};
 
 #[derive(Default)]
-pub struct LeastResponseTimeStrategy;
+pub struct LeastResponseTimeStrategy {
+    candidates: Vec<usize>,
+}
 
 impl SelectionStrategy for LeastResponseTimeStrategy {
     fn select(&mut self, ctx: &mut SelectionContext) -> Selection {
         let mut min_score = u64::MAX;
-        let mut candidates = Vec::new();
+        if self.candidates.capacity() < ctx.servers.len() {
+            self.candidates
+                .reserve(ctx.servers.len() - self.candidates.capacity());
+        }
+        self.candidates.clear();
 
         for (idx, server) in ctx.servers.iter().enumerate() {
             let score = server.base_latency_ms + (server.pick_count as u64 * 10);
             if score < min_score {
                 min_score = score;
-                candidates.clear();
-                candidates.push(idx);
+                self.candidates.clear();
+                self.candidates.push(idx);
             } else if score == min_score {
-                candidates.push(idx);
+                self.candidates.push(idx);
             }
         }
 
-        let choice = if candidates.len() == 1 {
-            candidates[0]
+        let choice = if self.candidates.len() == 1 {
+            self.candidates[0]
         } else {
-            let pick = ctx.rng.gen_range(0..candidates.len());
-            candidates[pick]
+            let pick = ctx.rng.gen_range(0..self.candidates.len());
+            self.candidates[pick]
         };
 
         Selection {
@@ -73,7 +79,7 @@ mod tests {
             },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
-        let mut strategy = LeastResponseTimeStrategy;
+        let mut strategy = LeastResponseTimeStrategy::default();
         let mut ctx = SelectionContext {
             servers: &servers,
             time_ms: 0,
@@ -124,7 +130,7 @@ mod tests {
         };
 
         let mut rng = rand::rngs::StdRng::seed_from_u64(99);
-        let mut strategy = LeastResponseTimeStrategy;
+        let mut strategy = LeastResponseTimeStrategy::default();
         let mut ctx = SelectionContext {
             servers: &servers,
             time_ms: 0,
