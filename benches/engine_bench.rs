@@ -1,8 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
-use load_balancer_cli::engine::run_simulation;
-use load_balancer_cli::models::{
-    AlgoConfig, RequestProfile, ServerConfig, SimConfig, TieBreakConfig,
-};
+use lb_sim::engine::run_simulation;
+use lb_sim::models::{AlgoConfig, RequestProfile, ServerConfig, SimConfig, TieBreakConfig};
 
 const REQUESTS: usize = 1_000;
 const SERVERS: usize = 8;
@@ -42,7 +40,7 @@ fn bench_engine(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new(algo_label, &size_label),
             &algo,
-            |b, algo| {
+            |b, algo: &AlgoConfig| {
                 b.iter_batched(
                     || build_config(algo.clone()),
                     |config| {

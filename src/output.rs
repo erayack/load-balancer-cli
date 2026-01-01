@@ -1,4 +1,4 @@
-use crate::state::{Assignment, RunMetadata, ServerSummary, SimulationResult};
+use crate::state::{Assignment, Phase1Metrics, RunMetadata, ServerSummary, SimulationResult};
 use serde::Serialize;
 
 pub trait Formatter {
@@ -42,6 +42,7 @@ impl Formatter for JsonFormatter {
                 request_id: assignment.request_id,
                 server_id: assignment.server_id,
                 server_name: server_name_for(assignment, &result.totals),
+                arrival_time_ms: assignment.arrival_time_ms,
                 started_at: assignment.started_at,
                 completed_at: assignment.completed_at,
                 score: assignment.score,
@@ -51,6 +52,7 @@ impl Formatter for JsonFormatter {
             assignments,
             totals: &result.totals,
             metadata: &result.metadata,
+            phase1_metrics: &result.phase1_metrics,
         };
         serde_json::to_string_pretty(&json).unwrap()
     }
@@ -104,6 +106,7 @@ struct JsonAssignment<'a> {
     request_id: usize,
     server_id: usize,
     server_name: &'a str,
+    arrival_time_ms: u64,
     started_at: u64,
     completed_at: u64,
     score: Option<u64>,
@@ -114,6 +117,7 @@ struct JsonSimulationResult<'a> {
     assignments: Vec<JsonAssignment<'a>>,
     totals: &'a [ServerSummary],
     metadata: &'a RunMetadata,
+    phase1_metrics: &'a Phase1Metrics,
 }
 
 #[cfg(test)]
@@ -126,6 +130,7 @@ mod tests {
             assignments: vec![Assignment {
                 request_id: 1,
                 server_id: 0,
+                arrival_time_ms: 0,
                 score: Some(10),
                 started_at: 0,
                 completed_at: 10,
@@ -139,6 +144,19 @@ mod tests {
                 algo: "round-robin".to_string(),
                 tie_break: "stable".to_string(),
                 duration_ms: 10,
+            },
+            phase1_metrics: Phase1Metrics {
+                response_time: crate::state::ResponseTimePercentiles {
+                    p95_ms: Some(10),
+                    p99_ms: Some(10),
+                },
+                per_server_utilization: vec![crate::state::ServerUtilization {
+                    name: "api".to_string(),
+                    utilization_pct: 100.0,
+                }],
+                jain_fairness: 1.0,
+                throughput_rps: 100.0,
+                avg_wait_ms: 0,
             },
         }
     }
@@ -185,6 +203,7 @@ mod tests {
       "request_id": 1,
       "server_id": 0,
       "server_name": "api",
+      "arrival_time_ms": 0,
       "started_at": 0,
       "completed_at": 10,
       "score": 10
@@ -201,6 +220,21 @@ mod tests {
     "algo": "round-robin",
     "tie_break": "stable",
     "duration_ms": 10
+  },
+  "phase1_metrics": {
+    "response_time": {
+      "p95_ms": 10,
+      "p99_ms": 10
+    },
+    "per_server_utilization": [
+      {
+        "name": "api",
+        "utilization_pct": 100.0
+      }
+    ],
+    "jain_fairness": 1.0,
+    "throughput_rps": 100.0,
+    "avg_wait_ms": 0
   }
 }"#;
         assert_eq!(output, expected);

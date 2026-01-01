@@ -1,10 +1,10 @@
 [package]
-name = "load-balancer-cli"
+name = "lb-sim"
 version = "0.1.0"
 edition = "2021"
 
 [[bin]]
-name = "load-balancer-cli"
+name = "lb-sim"
 path = "src/bin/load-balancer.rs"
 
 [dependencies]
@@ -33,4 +33,8 @@ harness = false
 
 [[bench]]
 name = "selection_bench"
+harness = false
+
+[[bench]]
+name = "engine_queue_bench"
 harness = false

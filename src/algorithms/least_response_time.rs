@@ -17,7 +17,10 @@ impl SelectionStrategy for LeastResponseTimeStrategy {
         }
 
         for (idx, server) in ctx.servers.iter().enumerate() {
-            let score = server.base_latency_ms + (server.pick_count as u64 * 10);
+            let score = server
+                .next_available_ms
+                .max(ctx.time_ms)
+                .saturating_add(server.base_latency_ms);
             if score < min_score {
                 min_score = score;
                 self.candidates.clear();
@@ -58,6 +61,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 0,
                 in_flight: 0,
+                next_available_ms: 0,
             },
             ServerState {
                 id: 1,
@@ -67,6 +71,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 2,
                 in_flight: 0,
+                next_available_ms: 50,
             },
             ServerState {
                 id: 2,
@@ -76,6 +81,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 0,
                 in_flight: 0,
+                next_available_ms: 0,
             },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
@@ -102,6 +108,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 0,
                 in_flight: 0,
+                next_available_ms: 0,
             },
             ServerState {
                 id: 1,
@@ -111,6 +118,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 1,
                 in_flight: 0,
+                next_available_ms: 10,
             },
             ServerState {
                 id: 2,
@@ -120,6 +128,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 0,
                 in_flight: 0,
+                next_available_ms: 0,
             },
         ];
         let candidates = [0usize, 1];

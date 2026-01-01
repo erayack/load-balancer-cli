@@ -25,6 +25,7 @@ pub struct ServerConfig {
 pub enum RequestProfile {
     FixedCount(usize),
     Poisson { rate: f64, duration_ms: u64 },
+    Burst { count: usize, at_ms: u64 },
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

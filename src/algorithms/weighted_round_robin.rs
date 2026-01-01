@@ -68,6 +68,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 0,
                 in_flight: 0,
+                next_available_ms: 0,
             },
             ServerState {
                 id: 1,
@@ -77,6 +78,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 0,
                 in_flight: 0,
+                next_available_ms: 0,
             },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);
@@ -103,6 +105,7 @@ mod tests {
             active_connections: 0,
             pick_count: 0,
             in_flight: 0,
+            next_available_ms: 0,
         }];
         let servers_v2 = vec![
             ServerState {
@@ -113,6 +116,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 0,
                 in_flight: 0,
+                next_available_ms: 0,
             },
             ServerState {
                 id: 1,
@@ -122,6 +126,7 @@ mod tests {
                 active_connections: 0,
                 pick_count: 0,
                 in_flight: 0,
+                next_available_ms: 0,
             },
         ];
         let mut rng = rand::rngs::StdRng::seed_from_u64(1);

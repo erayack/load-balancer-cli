@@ -1,7 +1,7 @@
-use load_balancer_cli::config::{self, format_config, Command, FormatArg, RunArgs};
-use load_balancer_cli::engine;
-use load_balancer_cli::error::Result;
-use load_balancer_cli::output::{Formatter, HumanFormatter, JsonFormatter, SummaryFormatter};
+use lb_sim::config::{self, format_config, Command, FormatArg, RunArgs};
+use lb_sim::engine;
+use lb_sim::error::Result;
+use lb_sim::output::{Formatter, HumanFormatter, JsonFormatter, SummaryFormatter};
 
 fn main() {
     if let Err(err) = run() {

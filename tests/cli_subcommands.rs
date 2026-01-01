@@ -9,7 +9,7 @@ fn list_algorithms_prints_supported_values() {
         "least-response-time\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.arg("list-algorithms");
     cmd.assert().success().stdout(diff(expected));
 }
@@ -25,7 +25,7 @@ fn show_config_prints_parsed_configuration() {
         "- db (latency: 20ms, weight: 2)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "show-config",
         "--algo",

@@ -33,10 +33,10 @@ servers = [
         "tie_break: seeded(42)\n",
         "duration_ms: 21\n",
         "Summary:\n",
-        "a: 2 requests (avg response: 10ms)\n",
+        "a: 2 requests (avg response: 14ms)\n",
         "b: 1 requests (avg response: 20ms)\n",
     );
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args(["run", "--config", path.to_str().unwrap(), "--summary"]);
     cmd.assert().success().stdout(diff(expected));
 }
@@ -53,7 +53,7 @@ fn repeatable_server_flag_parses() {
         "db: 1 requests (avg response: 20ms)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "run",
         "--algo",
@@ -81,7 +81,7 @@ fn empty_servers_csv_with_server_entries_succeeds() {
         "cache: 1 requests (avg response: 20ms)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "run",
         "--algo",

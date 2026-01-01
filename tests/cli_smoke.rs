@@ -8,11 +8,11 @@ fn summary_round_robin_is_stable() {
         "tie_break: seeded(42)\n",
         "duration_ms: 21\n",
         "Summary:\n",
-        "a: 2 requests (avg response: 10ms)\n",
+        "a: 2 requests (avg response: 14ms)\n",
         "b: 1 requests (avg response: 20ms)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "--algo",
         "round-robin",
@@ -36,13 +36,13 @@ fn summary_least_response_time_is_stable() {
         "Metadata:\n",
         "algo: least-response-time\n",
         "tie_break: seeded(7)\n",
-        "duration_ms: 11\n",
+        "duration_ms: 20\n",
         "Summary:\n",
-        "fast: 2 requests (avg response: 10ms)\n",
+        "fast: 2 requests (avg response: 14ms)\n",
         "slow: 0 requests (avg response: 0ms)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "--algo",
         "least-response-time",
@@ -73,7 +73,7 @@ fn summary_preserves_input_order() {
         "m: 0 requests (avg response: 0ms)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "--algo",
         "round-robin",
@@ -97,14 +97,14 @@ fn summary_preserves_input_order_for_least_connections() {
         "Metadata:\n",
         "algo: least-connections\n",
         "tie_break: seeded(11)\n",
-        "duration_ms: 30\n",
+        "duration_ms: 42\n",
         "Summary:\n",
         "first: 1 requests (avg response: 10ms)\n",
-        "second: 2 requests (avg response: 20ms)\n",
+        "second: 2 requests (avg response: 29ms)\n",
         "third: 1 requests (avg response: 30ms)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "--algo",
         "least-connections",
@@ -130,17 +130,17 @@ fn full_output_least_response_time_includes_scores() {
         "Metadata:\n",
         "algo: least-response-time\n",
         "tie_break: seeded(7)\n",
-        "duration_ms: 12\n",
+        "duration_ms: 20\n",
         "Assignments:\n",
         "Request 1 -> a (score: 10ms)\n",
-        "Request 2 -> b (score: 10ms)\n",
+        "Request 2 -> b (score: 11ms)\n",
         "Request 3 -> a (score: 20ms)\n",
         "Summary:\n",
-        "a: 2 requests (avg response: 10ms)\n",
+        "a: 2 requests (avg response: 14ms)\n",
         "b: 1 requests (avg response: 10ms)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "--format",
         "human",
@@ -170,11 +170,11 @@ fn full_output_round_robin_omits_scores() {
         "Request 2 -> b\n",
         "Request 3 -> a\n",
         "Summary:\n",
-        "a: 2 requests (avg response: 10ms)\n",
+        "a: 2 requests (avg response: 14ms)\n",
         "b: 1 requests (avg response: 20ms)\n",
     );
 
-    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("load-balancer-cli");
+    let mut cmd = assert_cmd::cargo::cargo_bin_cmd!("lb-sim");
     cmd.args([
         "--format",
         "human",

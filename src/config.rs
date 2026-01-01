@@ -7,7 +7,7 @@ use crate::error::{Error, Result};
 use crate::models::{AlgoConfig, RequestProfile, ServerConfig, SimConfig, TieBreakConfig};
 
 #[derive(Parser, Debug)]
-#[command(name = "load-balancer-cli")]
+#[command(name = "lb-sim")]
 pub struct CliArgs {
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -19,6 +19,20 @@ pub struct CliArgs {
     pub server: Vec<String>,
     #[arg(long)]
     pub requests: Option<usize>,
+    #[arg(long, help = "Send all requests at once (burst)")]
+    pub burst: Option<usize>,
+    #[arg(long, default_value_t = 0, help = "Burst arrival time in ms")]
+    pub burst_at: u64,
+    #[arg(long, help = "Use Poisson arrivals at a rate above total capacity")]
+    pub overload: bool,
+    #[arg(
+        long,
+        default_value_t = 1.1,
+        help = "Overload factor applied to total weighted capacity (Poisson rate)"
+    )]
+    pub overload_factor: f64,
+    #[arg(long, default_value_t = 1000, help = "Overload duration in ms")]
+    pub overload_duration_ms: u64,
     #[arg(long)]
     pub summary: bool,
     #[arg(long, value_enum, default_value = "human")]
@@ -52,6 +66,20 @@ pub struct RunArgs {
     pub server: Vec<String>,
     #[arg(long)]
     pub requests: Option<usize>,
+    #[arg(long, help = "Send all requests at once (burst)")]
+    pub burst: Option<usize>,
+    #[arg(long, default_value_t = 0, help = "Burst arrival time in ms")]
+    pub burst_at: u64,
+    #[arg(long, help = "Use Poisson arrivals at a rate above total capacity")]
+    pub overload: bool,
+    #[arg(
+        long,
+        default_value_t = 1.1,
+        help = "Overload factor applied to total weighted capacity (Poisson rate)"
+    )]
+    pub overload_factor: f64,
+    #[arg(long, default_value_t = 1000, help = "Overload duration in ms")]
+    pub overload_duration_ms: u64,
     #[arg(long)]
     pub summary: bool,
     #[arg(long, value_enum, default_value = "human")]
@@ -105,6 +133,11 @@ pub fn parse_command() -> Result<Command> {
                 servers: args.servers,
                 server: args.server,
                 requests: args.requests,
+                burst: args.burst,
+                burst_at: args.burst_at,
+                overload: args.overload,
+                overload_factor: args.overload_factor,
+                overload_duration_ms: args.overload_duration_ms,
                 summary: args.summary,
                 format: args.format,
                 seed: args.seed,
@@ -117,6 +150,26 @@ pub fn parse_command() -> Result<Command> {
 
 pub fn build_config_from_run_args(args: RunArgs) -> Result<(SimConfig, FormatArg)> {
     let format = format_arg_from_run_args(&args);
+    if args.requests.is_some() && args.burst.is_some() {
+        return Err(Error::Cli(
+            "use either --requests or --burst, not both".to_string(),
+        ));
+    }
+    if args.overload && (args.requests.is_some() || args.burst.is_some()) {
+        return Err(Error::Cli(
+            "use either --overload or --requests/--burst, not both".to_string(),
+        ));
+    }
+    if args.overload && args.overload_factor <= 0.0 {
+        return Err(Error::Cli(
+            "--overload-factor must be greater than 0".to_string(),
+        ));
+    }
+    if args.overload && args.overload_duration_ms == 0 {
+        return Err(Error::Cli(
+            "--overload-duration-ms must be greater than 0".to_string(),
+        ));
+    }
     let mut config = if let Some(path) = args.config.as_ref() {
         load_config(path)?
     } else {
@@ -124,10 +177,31 @@ pub fn build_config_from_run_args(args: RunArgs) -> Result<(SimConfig, FormatArg
             .algo
             .clone()
             .ok_or_else(|| Error::Cli("missing required --algo".to_string()))?;
-        let requests = args
-            .requests
-            .ok_or_else(|| Error::Cli("missing required --requests".to_string()))?;
         let servers = parse_server_args(&args.server, args.servers.as_deref())?;
+        let requests = if args.overload {
+            RequestProfile::Poisson {
+                rate: capacity_rps(&servers) * args.overload_factor,
+                duration_ms: args.overload_duration_ms,
+            }
+        } else {
+            match (args.requests, args.burst) {
+                (Some(count), None) => RequestProfile::FixedCount(count),
+                (None, Some(count)) => RequestProfile::Burst {
+                    count,
+                    at_ms: args.burst_at,
+                },
+                (None, None) => {
+                    return Err(Error::Cli(
+                        "missing required --requests, --burst, or --overload".to_string(),
+                    ))
+                }
+                (Some(_), Some(_)) => {
+                    return Err(Error::Cli(
+                        "use either --requests or --burst, not both".to_string(),
+                    ))
+                }
+            }
+        };
         let tie_break = if args.seed.is_some() {
             TieBreakConfig::Seeded
         } else {
@@ -144,6 +218,19 @@ pub fn build_config_from_run_args(args: RunArgs) -> Result<(SimConfig, FormatArg
     }
     if let Some(requests) = args.requests {
         config.requests = RequestProfile::FixedCount(requests);
+    }
+    if let Some(count) = args.burst {
+        config.requests = RequestProfile::Burst {
+            count,
+            at_ms: args.burst_at,
+        };
+    }
+    if args.overload {
+        let rate = capacity_rps(&config.servers) * args.overload_factor;
+        config.requests = RequestProfile::Poisson {
+            rate,
+            duration_ms: args.overload_duration_ms,
+        };
     }
     if !args.server.is_empty() || args.servers.is_some() {
         config.servers = parse_server_args(&args.server, args.servers.as_deref())?;
@@ -267,14 +354,14 @@ fn parse_server_entry(entry: &str) -> Result<ServerConfig> {
 
 fn create_config(
     servers: Vec<ServerConfig>,
-    requests: usize,
+    requests: RequestProfile,
     algo: AlgoArg,
     tie_break: TieBreakConfig,
     seed: Option<u64>,
 ) -> SimConfig {
     SimConfig {
         servers,
-        requests: RequestProfile::FixedCount(requests),
+        requests,
         algo: algo.into(),
         tie_break,
         seed,
@@ -300,6 +387,9 @@ pub fn format_config(config: &SimConfig) -> String {
                 rate, duration_ms
             )
         }
+        RequestProfile::Burst { count, at_ms } => {
+            format!("Requests: burst(count={}, at_ms={})", count, at_ms)
+        }
     };
 
     let tie_break_label = config.tie_break.label_with_seed(config.seed);
@@ -319,4 +409,11 @@ pub fn format_config(config: &SimConfig) -> String {
     }
 
     lines.join("\n") + "\n"
+}
+
+fn capacity_rps(servers: &[ServerConfig]) -> f64 {
+    servers
+        .iter()
+        .map(|server| (1000.0 / server.base_latency_ms as f64) * server.weight as f64)
+        .sum()
 }

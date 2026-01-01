@@ -1,7 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, BenchmarkId, Criterion};
-use load_balancer_cli::algorithms::{build_strategy, SelectionContext, SelectionStrategy};
-use load_balancer_cli::models::AlgoConfig;
-use load_balancer_cli::state::ServerState;
+use lb_sim::algorithms::{build_strategy, SelectionContext};
+use lb_sim::models::AlgoConfig;
+use lb_sim::state::ServerState;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
@@ -18,6 +18,7 @@ fn build_servers(count: usize) -> Vec<ServerState> {
             active_connections: (idx % 3) as u32,
             pick_count: (idx % 5) as u32,
             in_flight: 0,
+            next_available_ms: 0,
         })
         .collect()
 }
@@ -37,7 +38,7 @@ fn bench_selection(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new(algo_label, &size_label),
             &algo,
-            |b, algo| {
+            |b, algo: &AlgoConfig| {
                 b.iter_batched(
                     || {
                         let servers = build_servers(SERVERS);
