@@ -90,4 +90,56 @@ mod tests {
         let picks: Vec<usize> = (0..6).map(|_| strategy.select(&mut ctx).server_id).collect();
         assert_eq!(picks, vec![0, 0, 1, 0, 0, 1]);
     }
+
+    #[test]
+    fn weighted_round_robin_rebuilds_cache_on_server_change() {
+        let servers_v1 = vec![ServerState {
+            id: 0,
+            name: "a".to_string(),
+            base_latency_ms: 10,
+            weight: 1,
+            active_connections: 0,
+            pick_count: 0,
+            in_flight: 0,
+        }];
+        let servers_v2 = vec![
+            ServerState {
+                id: 0,
+                name: "a".to_string(),
+                base_latency_ms: 10,
+                weight: 1,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
+            ServerState {
+                id: 1,
+                name: "b".to_string(),
+                base_latency_ms: 10,
+                weight: 2,
+                active_connections: 0,
+                pick_count: 0,
+                in_flight: 0,
+            },
+        ];
+        let mut rng = rand::rngs::StdRng::seed_from_u64(1);
+        let mut strategy = WeightedRoundRobinStrategy::default();
+        {
+            let mut ctx_v1 = SelectionContext {
+                servers: &servers_v1,
+                time_ms: 0,
+                rng: &mut rng,
+            };
+
+            assert_eq!(strategy.select(&mut ctx_v1).server_id, 0);
+        }
+
+        let mut ctx_v2 = SelectionContext {
+            servers: &servers_v2,
+            time_ms: 0,
+            rng: &mut rng,
+        };
+        let picks: Vec<usize> = (0..2).map(|_| strategy.select(&mut ctx_v2).server_id).collect();
+        assert_eq!(picks, vec![0, 1]);
+    }
 }
