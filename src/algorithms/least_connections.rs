@@ -10,11 +10,11 @@ pub struct LeastConnectionsStrategy {
 impl SelectionStrategy for LeastConnectionsStrategy {
     fn select(&mut self, ctx: &mut SelectionContext) -> Selection {
         let mut min_count = u32::MAX;
+        self.candidates.clear();
         if self.candidates.capacity() < ctx.servers.len() {
             self.candidates
-                .reserve(ctx.servers.len() - self.candidates.capacity());
+                .reserve(ctx.servers.len().saturating_sub(self.candidates.len()));
         }
-        self.candidates.clear();
 
         for (idx, server) in ctx.servers.iter().enumerate() {
             if server.active_connections < min_count {

@@ -10,11 +10,11 @@ pub struct LeastResponseTimeStrategy {
 impl SelectionStrategy for LeastResponseTimeStrategy {
     fn select(&mut self, ctx: &mut SelectionContext) -> Selection {
         let mut min_score = u64::MAX;
+        self.candidates.clear();
         if self.candidates.capacity() < ctx.servers.len() {
             self.candidates
-                .reserve(ctx.servers.len() - self.candidates.capacity());
+                .reserve(ctx.servers.len().saturating_sub(self.candidates.len()));
         }
-        self.candidates.clear();
 
         for (idx, server) in ctx.servers.iter().enumerate() {
             let score = server.base_latency_ms + (server.pick_count as u64 * 10);

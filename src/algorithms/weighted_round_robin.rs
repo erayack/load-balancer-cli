@@ -87,7 +87,9 @@ mod tests {
             rng: &mut rng,
         };
 
-        let picks: Vec<usize> = (0..6).map(|_| strategy.select(&mut ctx).server_id).collect();
+        let picks: Vec<usize> = (0..6)
+            .map(|_| strategy.select(&mut ctx).server_id)
+            .collect();
         assert_eq!(picks, vec![0, 0, 1, 0, 0, 1]);
     }
 
@@ -139,7 +141,9 @@ mod tests {
             time_ms: 0,
             rng: &mut rng,
         };
-        let picks: Vec<usize> = (0..2).map(|_| strategy.select(&mut ctx_v2).server_id).collect();
+        let picks: Vec<usize> = (0..2)
+            .map(|_| strategy.select(&mut ctx_v2).server_id)
+            .collect();
         assert_eq!(picks, vec![0, 1]);
     }
 }
