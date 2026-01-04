@@ -302,7 +302,7 @@ pub fn parse_server_args(
     let mut servers = Vec::new();
     let mut names = HashSet::new();
     for entry in entries {
-        let server = parse_server_entry(&entry)?;
+        let server = parse_server_spec(&entry)?;
         if names.contains(&server.name) {
             return Err(Error::DuplicateServerName(server.name));
         }
@@ -313,7 +313,7 @@ pub fn parse_server_args(
     Ok(servers)
 }
 
-fn parse_server_entry(entry: &str) -> Result<ServerConfig> {
+fn parse_server_spec(entry: &str) -> Result<ServerConfig> {
     let trimmed = entry.trim();
     if trimmed.is_empty() {
         return Err(Error::EmptyServerEntry);
@@ -425,13 +425,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_server_entry_handles_weight_and_default() {
-        let weighted = parse_server_entry("api:25:3").expect("weighted server should parse");
+    fn parse_server_spec_handles_weight_and_default() {
+        let weighted = parse_server_spec("api:25:3").expect("weighted server should parse");
         assert_eq!(weighted.name, "api");
         assert_eq!(weighted.base_latency_ms, 25);
         assert_eq!(weighted.weight, 3);
 
-        let defaulted = parse_server_entry("db:40").expect("default weight should parse");
+        let defaulted = parse_server_spec("db:40").expect("default weight should parse");
         assert_eq!(defaulted.name, "db");
         assert_eq!(defaulted.base_latency_ms, 40);
         assert_eq!(defaulted.weight, 1);
